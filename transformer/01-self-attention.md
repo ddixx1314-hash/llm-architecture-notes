@@ -235,7 +235,7 @@ $$
    A · V             →  output (n × d_v)  [加权求和]
 ```
 
-![Scaled Dot-Product Attention](images/scaled-dot-product-attention.png)
+<div align="center"><img src="images/scaled-dot-product-attention.png" width="65%"></div>
 
 图:Scaled Dot-Product Attention 的计算路径。来源:Vaswani et al., 2017, *Attention Is All You Need*, Figure 2(left)。
 

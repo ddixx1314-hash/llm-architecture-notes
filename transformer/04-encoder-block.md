@@ -70,7 +70,7 @@ $$
 X^{(0)} \rightarrow X^{(1)} \rightarrow \cdots \rightarrow X^{(N)}
 $$
 
-![Transformer Architecture](images/transformer-architecture.png)
+<div align="center"><img src="images/transformer-architecture.png" width="70%"></div>
 
 图:原始 Transformer 的 Encoder-Decoder 总体结构。左侧是 Encoder stack,右侧是 Decoder stack。来源:Vaswani et al., 2017, *Attention Is All You Need*, Figure 1。
 

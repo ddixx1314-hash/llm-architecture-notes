@@ -93,7 +93,7 @@ S4 可以理解为:
 
 > 把 HiPPO 风格的结构化 SSM 做成可训练、可并行、适合深度学习的序列层。
 
-![S4 State Space Overview](images/s4-state-space-overview.png)
+<div align="center"><img src="images/s4-state-space-overview.png" width="65%"></div>
 
 图:S4 论文对 State Space Model 的直观概览:连续状态空间、长程依赖结构、离散/卷积表示。来源:Gu et al., 2021, *Efficiently Modeling Long Sequences with Structured State Spaces*, Figure 1。
 

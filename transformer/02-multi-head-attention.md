@@ -67,7 +67,7 @@ $$
 \boxed{\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \dots, \text{head}_h) \cdot W^O}
 $$
 
-![Multi-Head Attention](images/multi-head-attention.png)
+<div align="center"><img src="images/multi-head-attention.png" width="60%"></div>
 
 图:Multi-Head Attention 会并行做 $h$ 个 Scaled Dot-Product Attention,再 concat 并投影。来源:Vaswani et al., 2017, *Attention Is All You Need*, Figure 2(right)。
 

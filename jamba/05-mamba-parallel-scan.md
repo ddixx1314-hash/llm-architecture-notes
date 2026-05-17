@@ -128,7 +128,7 @@ Mamba 的实现思路是:
 
 > 把中间状态尽量留在片上 SRAM/registers,只把必要结果写回显存。
 
-![Selective SSM Overview](images/mamba-selective-ssm-overview.png)
+<div align="center"><img src="images/mamba-selective-ssm-overview.png" width="70%"></div>
 
 图:Mamba 的 Selective SSM 概览:$B_t,C_t,\Delta_t$ 由输入生成,并通过硬件感知 scan 避免把大状态完整写回 HBM。来源:Gu & Dao, 2023, *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*, Figure 1。
 

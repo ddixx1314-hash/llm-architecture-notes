@@ -75,7 +75,7 @@ Jamba 论文中的一个关键设计是 Attention 层和 Mamba 层按稀疏比�
 每 8 个序列混合层里,大约 1 个 Attention,7 个 Mamba
 ```
 
-![Jamba Block Architecture](images/jamba-block-architecture.png)
+<div align="center"><img src="images/jamba-block-architecture.png" width="70%"></div>
 
 图:Jamba block 示例:以 $a:m=1:7$ 混合 Attention 和 Mamba,并每隔 $e=2$ 层使用 MoE。来源:Lieber et al., 2024, *Jamba: A Hybrid Transformer-Mamba Language Model*, Figure 1。
 

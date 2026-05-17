@@ -68,7 +68,7 @@ $$
 y_t=C_t x_t
 $$
 
-![Mamba Block Architecture](images/mamba-block-architecture.png)
+<div align="center"><img src="images/mamba-block-architecture.png" width="65%"></div>
 
 图:Mamba block 把 H3 风格的 SSM 分支和 gated MLP 思路合到一个重复堆叠的模块里。来源:Gu & Dao, 2023, *Mamba: Linear-Time Sequence Modeling with Selective State Spaces*, Figure 3。
 
