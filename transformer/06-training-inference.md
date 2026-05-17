@@ -279,6 +279,8 @@ $$
 
 ## 6.10 KV Cache 降低了什么复杂度?
 
+⚠️ **下面的复杂度只算 attention 部分**(因为 KV Cache 优化的就是 attention 重复计算)。FFN 部分两种情况差不多 — 每生成一个新 token 都要过一次 FFN,这是无法 cache 的。
+
 设已经生成到长度 $L$。
 
 ### 没有 KV Cache
@@ -311,14 +313,30 @@ $$
 
 所以 KV Cache 不会让自回归生成变成并行,但能避免大量重复计算。
 
+### 把 FFN 算进来
+
+每个 token 过一次 FFN 是 $O(d \cdot d_{\text{ff}}) \approx O(d^2)$。生成 $L$ 个 token 总 FFN 计算是 $O(L d^2)$,**两种情况都一样**(因为 FFN 是 position-wise,无 cache 可言)。
+
+合计:
+
+| 部分 | 无 cache | 有 cache |
+|------|---------|----------|
+| Attention | $O(L^3 d)$ | $O(L^2 d)$ |
+| FFN | $O(L d^2)$ | $O(L d^2)$ |
+
+**关键观察**:
+- 当 $L \gg d$(长上下文),attention 主导,KV Cache 至关重要(否则 $L^3$ 爆炸)
+- 当 $L \ll d$(短上下文、大模型),FFN 主导,KV Cache 收益相对小
+- 实际推理两者都重要,但 KV Cache 是"必备",FFN 优化(如 MoE)是另一条线
+
 ---
 
 ## 6.11 KV Cache 的代价:显存
 
-每层都要缓存 K 和 V:
+每层都要缓存 K 和 V(以下假设是标准 MHA,每个 head 都缓存自己的 K/V):
 
 $$
-\text{cache size} \approx 2 \cdot L \cdot d_{\text{model}} \cdot \text{num_layers}
+\text{cache size} \approx 2 \cdot L \cdot d_{\text{model}} \cdot \text{num\_layers}
 $$
 
 再乘上 batch size 和数据类型字节数。
@@ -337,6 +355,14 @@ $$
 $$
 
 这就是长上下文推理很吃显存的根源之一。
+
+⚠️ **GQA / MQA 会按比例减少**:若 KV head 数为 $h_{kv}$,query head 数为 $h$,则 cache 大小变为:
+
+$$
+2 \cdot L \cdot d_{\text{model}} \cdot \frac{h_{kv}}{h} \cdot \text{num\_layers}
+$$
+
+LLaMA 3 70B 用 $h = 64, h_{kv} = 8$,KV cache 直接降到 MHA 的 $1/8$。这就是为什么现代大模型几乎都采用 GQA(详见 [第 7 节](07-modern-variants.md))。
 
 ---
 
@@ -404,6 +430,19 @@ Prefill 指的是推理开始时把 prompt 一次性跑完,把每层 K/V 写入 
 2. causal mask 已经防止偷看未来,为什么 labels 还要右移一位?
 3. 如果把 temperature 设得非常大,生成结果会发生什么?
 4. KV Cache 的大小为什么和序列长度线性相关,而不是平方相关?
+
+<details>
+<summary><b>参考思路</b></summary>
+
+**1.** 训练时**整段序列一次性并行计算**,所有位置的 K/V 同时算出来,没有"过去 vs 新增"的区分,cache 没有意义。推理时每步只新增 1 个 token,前面 token 的 K/V 在结构上已经算过(且因为 causal mask,它们的值不会因为新 token 出现而改变),所以缓存能节省 $O(L)$ 倍计算。
+
+**2.** Causal mask 保证位置 $t$ 的输出 $h_t$ 只依赖输入位置 $\leq t$。但 $h_t$ 应该预测什么?我们希望 $h_t$ 预测**下一个 token**,即 $x_{t+1}$。如果 labels 不右移,$h_t$ 就被强制预测 $x_t$(它自己,经过 mask 后是个恒等映射,trivial)。右移让 $h_t$ 真正预测"未来",才形成 next-token prediction 任务。
+
+**3.** $T \to \infty$ 时 $\text{logits}/T \to 0$,softmax 趋于**均匀分布**,采样退化为词表均匀随机选择。生成结果是**完全随机的乱码**,丢失所有语言结构。反过来 $T \to 0$ 等价于 greedy。
+
+**4.** Cache 存的是 K 和 V — 每个 token 的 K/V 在算出来之后**不再改变**(因为 causal mask),也不需要重算。所以每生成一个新 token,只在 cache 末尾追加一个固定大小的条目,总大小线性增长。注意力**计算**复杂度仍是 $O(L^2 d)$(每个新 query 要和 $L$ 个 cached key 做点积),但**存储**只需 $O(L)$。这是 cache 经常和 attention 复杂度被混淆的地方。
+
+</details>
 
 ---
 

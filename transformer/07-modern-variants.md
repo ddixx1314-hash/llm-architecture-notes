@@ -187,7 +187,24 @@ $$
 然后 attention 分数变成:
 
 $$
-\tilde{q}_m^T \tilde{k}_n = q_m^T R_m^T R_n k_n = q_m^T R_{n-m} k_n
+\tilde{q}_m^T \tilde{k}_n = (R_m q_m)^T (R_n k_n) = q_m^T R_m^T R_n k_n
+$$
+
+这里要用到旋转矩阵的**群性质**:
+
+1. **正交性**:$R_m^T = R_m^{-1} = R_{-m}$(旋转 $m$ 角度的逆等于反向旋转 $m$ 角度)
+2. **加法律**:$R_a R_b = R_{a+b}$(两次旋转可合并为一次)
+
+把两个性质合起来:
+
+$$
+R_m^T R_n = R_{-m} R_n = R_{n-m}
+$$
+
+所以:
+
+$$
+\tilde{q}_m^T \tilde{k}_n = q_m^T R_{n-m} k_n
 $$
 
 注意最后只依赖相对距离:
@@ -196,7 +213,7 @@ $$
 n - m
 $$
 
-这就是 RoPE 的核心:通过旋转 Q/K,让点积分数天然包含相对位置信息。
+这就是 RoPE 的核心:通过旋转 Q/K,让点积分数天然包含相对位置信息 — 无论 $m$ 和 $n$ 各自是多少,只要差不变,attention 分数就不变。这是**绝对位置编码 + 群结构 = 相对位置感知**的精妙构造。
 
 ---
 
@@ -386,6 +403,19 @@ Pre-RMSNorm + RoPE Attention(GQA) + SwiGLU FFN
 2. MQA 为什么可能损失效果?GQA 为什么是折中?
 3. RMSNorm 不减均值,为什么仍然能稳定训练?
 4. 如果没有 KV Cache 压力,GQA 还有必要吗?
+
+<details>
+<summary><b>参考思路</b></summary>
+
+**1.** 位置信息要影响的是"**谁关注谁**",也就是 attention score $q^T k$。给 $q$ 和 $k$ 旋转,attention score 就显式包含相对距离信息(见 7.7)。$V$ 是"被加权聚合的内容",位置信息应该通过**注意力权重**而不是 V 的值来表达。如果给 V 也旋转,attention 输出 $\sum \alpha_{ij} V_j$ 的语义会被位置依赖污染,效果反而下降。RoPE 论文实证也支持只转 Q/K。
+
+**2.** **MQA 损失效果**:所有 query head 共享一组 K/V,意味着 K/V 只有一个"视角",失去了"不同头看不同子空间"的多样性。Attention 的表达能力被限制。**GQA 是折中**:KV head 数为 $h_{kv}$($1 < h_{kv} < h$),既保留多组 KV 视角(多样性),又显著减少 KV cache 显存。LLaMA 3 70B 用 $h=64, h_{kv}=8$,效果接近 MHA,显存降到 1/8。
+
+**3.** 经验上**减均值的作用不大**,关键是控制向量的**尺度**。深层 Transformer 中,残差累积容易让向量范数爆炸,RMSNorm 把范数固定在常数附近就够了。均值偏移本身可以被下一层的线性变换吸收(bias 项)。论文实证 RMSNorm 和 LayerNorm 效果相当甚至略好,但计算量减少 ~7-15%(少了求 mean 和减法)。
+
+**4.** 几乎没必要。GQA 损失了一部分表达能力换取 cache 减小,如果显存不是瓶颈(短上下文、小 batch、训练阶段),直接用 MHA 效果更好。所以训练时一般用 MHA,推理时换成 GQA(或训练时就用 GQA 以保证推理一致性)。当前 LLM 之所以普遍用 GQA,根源就是长上下文 + 大并发推理的 KV cache 压力。
+
+</details>
 
 ---
 

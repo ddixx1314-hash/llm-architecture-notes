@@ -74,10 +74,14 @@ $$
 g \in \mathbb{R}^{E}
 $$
 
+含义:**对每个 token,把它的 $D$ 维表示映射成 $E$ 个分数,一个分数对应一个专家**。
+
+⚠️ **softmax 在 $E$ 维上做,不是 token 维**。这点很容易写错——我们要的是"一个 token 在所有专家间的概率分布",所以 softmax 应该作用在 expert 维上。如果在 token 维上做,会变成"每个专家选择哪些 token"——意思完全相反。
+
 对 $g$ 做 softmax:
 
 $$
-p = \text{softmax}(g)
+p = \text{softmax}(g),\quad p \in \mathbb{R}^E
 $$
 
 然后选概率最高的 Top-K 个专家。
@@ -89,6 +93,12 @@ y=\sum_{i \in \text{TopK}(p)} p_i E_i(x)
 $$
 
 注意这里 $p_i$ 是专家输出的加权系数。
+
+📌 **两种 softmax 顺序的微妙区别**:
+- **先 softmax 再 TopK**(常见教程版):上面的写法。Top-K 之外的概率会被丢弃,所以选中的 K 个概率和 $< 1$,通常需要重新归一化
+- **先 TopK 再 softmax**(Mixtral / Jamba 实际用的):先选 Top-K logits,只在这 K 个上做 softmax,天然归一化为 1,**且未选中的 logits 完全不进 softmax 分母**,数值更稳定
+
+两种数学上不严格等价,但实践中差别不大。第 6.8 节代码用的是第二种。
 
 ---
 
@@ -182,6 +192,10 @@ token batch
 
 ## 6.8 MoE 代码骨架
 
+下面给两个版本:**版本 A** 容易理解但低效(逐专家循环),**版本 B** 是工业实现里常见的"按 (token, slot) 展开"风格,逻辑更清楚也避免聚合错误。
+
+### 版本 A:逐专家循环 (易读)
+
 ```python
 import torch
 import torch.nn as nn
@@ -194,34 +208,74 @@ class TopKMoE(nn.Module):
         self.top_k = top_k
         self.router = nn.Linear(d_model, num_experts, bias=False)
         self.experts = nn.ModuleList([
-            FeedForward(d_model, d_ff)
-            for _ in range(num_experts)
+            FeedForward(d_model, d_ff) for _ in range(num_experts)
         ])
 
     def forward(self, x):
-        # x: (batch, L, d_model)
-        gate_logits = self.router(x)
-        gate_probs = F.softmax(gate_logits, dim=-1)
-        top_probs, top_idx = torch.topk(gate_probs, self.top_k, dim=-1)
-        top_probs = top_probs / top_probs.sum(dim=-1, keepdim=True)
+        # x: (B, L, D) → 把 token 维展平到 (T, D),T = B*L
+        B, L, D = x.shape
+        x_flat = x.reshape(-1, D)                          # (T, D)
+        T = x_flat.size(0)
 
-        out = torch.zeros_like(x)
-        for expert_id, expert in enumerate(self.experts):
-            mask = top_idx == expert_id
-            if not mask.any():
+        # 1. 路由:对每个 token 选 Top-K 专家
+        logits = self.router(x_flat)                       # (T, E)
+        top_logits, top_idx = logits.topk(self.top_k, dim=-1)  # (T, K)
+        top_weights = F.softmax(top_logits, dim=-1)        # (T, K),只在 K 上归一化
+
+        # 2. 逐专家收集 token、跑 FFN、按权重写回
+        out = torch.zeros_like(x_flat)
+        for e in range(self.num_experts):
+            # 哪些 (token, slot) 对选中了专家 e
+            hit = (top_idx == e)                           # (T, K) bool
+            if not hit.any():
                 continue
 
-            token_mask = mask.any(dim=-1)
-            expert_input = x[token_mask]
-            expert_output = expert(expert_input)
+            token_ids, slot_ids = hit.nonzero(as_tuple=True)  # 每个命中的 (t, k)
+            expert_in = x_flat[token_ids]                  # (M, D)
+            expert_out = self.experts[e](expert_in)        # (M, D)
 
-            weights = torch.where(mask[token_mask], top_probs[token_mask], 0.0).sum(dim=-1)
-            out[token_mask] += expert_output * weights.unsqueeze(-1)
+            # 取出每个命中位置对应的权重(只取该 slot,不要 sum 别的 slot)
+            w = top_weights[token_ids, slot_ids].unsqueeze(-1)  # (M, 1)
+            out.index_add_(0, token_ids, expert_out * w)
 
-        return out
+        return out.reshape(B, L, D)
 ```
 
-这个版本方便理解,但真实 MoE 实现会用更高效的 token dispatch 和 expert parallel。
+### 版本 B:按 (token, slot) 展开 (推荐)
+
+完全避开"一个 token 选了多个专家时如何聚合权重"的坑——每个 (token, slot) 对就是一个独立的工作单元。
+
+```python
+def forward(self, x):
+    B, L, D = x.shape
+    x_flat = x.reshape(-1, D)                              # (T, D)
+    T, K, E = x_flat.size(0), self.top_k, self.num_experts
+
+    logits = self.router(x_flat)                           # (T, E)
+    top_logits, top_idx = logits.topk(K, dim=-1)           # (T, K)
+    top_weights = F.softmax(top_logits, dim=-1)            # (T, K)
+
+    # 把 (T, K) 展开成 T*K 个 (token_id, expert_id, weight) 三元组
+    flat_token = torch.arange(T, device=x.device).repeat_interleave(K)  # (T*K,)
+    flat_expert = top_idx.reshape(-1)                      # (T*K,)
+    flat_weight = top_weights.reshape(-1)                  # (T*K,)
+
+    out = torch.zeros_like(x_flat)
+    for e in range(E):
+        mask = (flat_expert == e)
+        if not mask.any():
+            continue
+        sel_tokens = flat_token[mask]                      # 命中专家 e 的 token id
+        sel_w = flat_weight[mask].unsqueeze(-1)            # 对应权重
+        expert_out = self.experts[e](x_flat[sel_tokens])   # (M, D)
+        out.index_add_(0, sel_tokens, expert_out * sel_w)
+
+    return out.reshape(B, L, D)
+```
+
+> ⚠️ **常见 bug 提醒**:不要写 `weights = torch.where(mask, top_probs, 0.0).sum(dim=-1)` 来取权重。当一个 token 在 Top-K 里**同时**命中两个专家、且当前遍历到其中一个专家时,`.sum(dim=-1)` 会把**两个 slot 的权重都累加**,但实际只应该用当前专家对应的那个 slot。上面两版都通过取 `(token_id, slot_id)` 二维索引避开了这个陷阱。
+
+> 真实 MoE 实现(megablocks、tutel、scattermoe)还会进一步:用 grouped GEMM 替代逐专家循环、用 token sort 提高内存连续性、用 capacity factor 把不规则形状变成静态形状。这些都是为了贴合 GPU。
 
 ---
 
@@ -269,3 +323,35 @@ Jamba 也是用 MoE 增大模型容量,但不会让每个 token 激活所有专�
 - 为什么 Jamba 可以同时有长上下文和较大总参数?
 
 → [第 7 节:Jamba 整体架构](07-jamba-architecture.md)
+
+---
+
+## 6.12 思考题(可选)
+
+1. MoE 通过稀疏激活把"总参数"和"激活参数"解耦——但 GPU 上**总参数仍然要全部装载到显存**。那 MoE 相比同总参数的 dense 模型,真正的优势在哪?
+2. 如果 Top-K 设置成 K=1 (Switch Transformer 风格) vs K=2 (Mixtral/Jamba 风格),分别有什么取舍?
+3. Load balance loss 鼓励均匀分配,但这和"专家分工"的初衷不冲突吗?直觉上不同 token 类型应该走不同专家才对。
+
+<details>
+<summary><b>参考思路</b>(先自己想 3-5 分钟再展开)</summary>
+
+**1.** 训练时:总参数全部要算 backward,但**每个 token 的 forward / backward 算力只和激活参数成正比**。在 token 数远多于专家数的情况下,batch 级的总 FLOPs 接近"激活参数 × token 数",dense 模型则是"总参数 × token 数",MoE 节约的算力很可观。推理时:显存装载确实是 dense 的代价,但 decode 的瓶颈是**每个 token 的 FLOPs 和延迟**,MoE 在这里赢——所以适合云端推理,但不太适合手机端(那里显存是硬约束)。
+
+**2.** **K=1** (Switch):路由简单(每 token 单专家),通信少,但路由错误成本高(一个 token 全押到某个专家)、训练不稳定,需要更激进的 capacity / aux loss。**K=2** (Mixtral/Jamba):路由错误时还有 backup,梯度信号更平滑,工程上更稳;代价是计算量翻倍(虽然 token 多到能摊销)。实际经验:K=2 更鲁棒,K=1 更便宜但调参难。
+
+**3.** **目标是"软均匀"**——load balance loss 不是强制完全均匀(完全均匀就 = 随机路由,失去 MoE 意义),而是阻止**极端不平衡**(99% token 走同一个专家)。它鼓励"在统计意义上各专家被选概率接近,但任意单个 token 仍然可以有强烈倾向"。可以想成正则化:类似 dropout,牺牲一点"专家分工的极致性"换取**训练稳定性 + 不浪费参数**。
+
+</details>
+
+---
+
+## 6.13 论文/源码对照
+
+| 概念 | 论文符号 / 章节 | 源码位置 |
+|---|---|---|
+| Top-K Sparse Gating | Shazeer 2017 (arxiv 1701.06538) §2.1 | HuggingFace `transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock` |
+| Switch Transformer (K=1) | Fedus 2021 (arxiv 2101.03961) | `t5x` 仓库 |
+| Load balance loss $\mathcal{L}_{\text{aux}} = E \cdot \sum_e f_e \cdot P_e$ | Fedus 2021 Eq.(4) | Mixtral 实现中的 `load_balancing_loss_func` |
+| Capacity factor | GShard / Switch Transformer | `megablocks` 仓库 |
+| Token dispatch (all-to-all) | GShard paper Figure 2 | `tutel`、`megablocks::ops` |
+| Jamba MoE 配置 | Jamba paper §3.1 (E=16, K=2, 每 2 层一次) | HuggingFace `transformers.JambaSparseMoeBlock` |

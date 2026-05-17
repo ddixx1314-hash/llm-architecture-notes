@@ -81,9 +81,24 @@ $$
 
 这正好是 SSM 形式。
 
-所以 HiPPO 给 SSM 提供的是一种**初始化和结构设计原则**:
+含义:**HiPPO 不是新模型,而是为已有的 SSM 形式给出了一组"有理论保证的" $A, B$ 矩阵**。学过的连续时间 SSM 框架不用变,只是 $A, B$ 的选择有了明确的优化目标(最小化历史函数的逼近误差)。
 
-> 选择合适的 $A,B$,让状态天然适合长程记忆。
+### HiPPO-LegS 的显式矩阵
+
+最常被引用的是 **HiPPO-LegS**(Legendre Scaled),它对应于"在时间 $[0, t]$ 上用 Legendre 多项式逼近历史"。其矩阵 $A \in \mathbb{R}^{N \times N}$ 是**下三角** + 对角的形式:
+
+$$
+A_{nk} = -\begin{cases}
+(2n+1)^{1/2}(2k+1)^{1/2} & n > k \\
+n+1 & n = k \\
+0 & n < k
+\end{cases}, \quad
+B_n = (2n+1)^{1/2}
+$$
+
+📌 **关键性质**:HiPPO-LegS 的 $A$ 是**负定**(所有特征值实部 $< 0$),所以离散化后 $\bar{A} = e^{A\Delta}$ 的范数 $< 1$,状态自然衰减不会爆炸——这是它适合做"长程记忆"的核心数学保证。
+
+> 💡 不用记这个公式。重点是知道:**S4/Mamba 中 $A$ 的初始化不是随机的**,而是用 HiPPO-LegS 这套有理论根据的矩阵作为起点。如果你随机初始化 $A$,模型很可能学不到长程依赖。这是 S4 论文最大的"工程秘诀"之一。
 
 ---
 
@@ -229,3 +244,34 @@ Mamba 让 $B_t,C_t,\Delta_t$ 依赖输入,本质上就是给状态模型加了�
 - 它和 Transformer block 的分工有什么相似之处?
 
 → [第 4 节:Mamba Selective SSM](04-mamba-selective.md)
+
+---
+
+## 3.12 思考题(可选)
+
+1. HiPPO-LegS 的 $A$ 是**稠密**下三角矩阵,$e^{A\Delta}$ 直接算要 $O(N^3)$。S4 怎么把它变得高效?(提示:NPLR 参数化)
+2. 如果不用 HiPPO 而用随机初始化的 $A$(对角、负实部),模型还能训出长程依赖吗?为什么 S4 论文非要用 HiPPO?
+3. Mamba 中 $A$ 也是 diagonal,但**不是用 HiPPO**。它怎么"放弃"了 HiPPO 的理论保证还能 work?
+
+<details>
+<summary><b>参考思路</b>(先自己想 3-5 分钟再展开)</summary>
+
+**1.** S4 把 HiPPO-LegS 的 $A$ 重写成 **Normal Plus Low-Rank (NPLR)**:$A = V \Lambda V^* - PQ^*$,其中 $V \Lambda V^*$ 是 normal 部分(可对角化),$PQ^*$ 是低秩修正。然后 $e^{A\Delta}$ 用 Cauchy kernel + 对角化技巧在 $O(N \log N)$ 算出来。这是 S4 论文的核心技术贡献,也是它能在 GPU 上跑大 $N$ 的原因。S4D 进一步把 $A$ 简化为对角(扔掉 low-rank 修正),发现性能基本不掉,$N$ 还能更大。
+
+**2.** 实验上,S4 原论文显示 HiPPO 初始化 vs 随机初始化在长程基准(如 Path-X, 16K 长度)上差几十个百分点。HiPPO 给的不是"必要"而是"训练稳定性"——它把模型推到一个好的局部最优附近。Mamba-1 实测显示,只要 $A$ 对角且实部为负,即使**不严格用 HiPPO 公式**,语言建模任务也能 work。Path-X 这类纯"记忆"任务才更需要 HiPPO。
+
+**3.** Mamba 的回答有两条:(a) $\Delta_t$ 输入依赖——让模型可以**动态调整有效记忆长度**,绕过固定 $A$ 的限制;(b) 多通道 SSM——每个通道独立的 $A$ 给出"不同时间尺度的滤波器组合",集体表达能力够用。所以 Mamba 把 HiPPO 的"静态最优"换成了"动态自适应"。
+
+</details>
+
+---
+
+## 3.13 论文/源码对照
+
+| 概念 | 论文符号 / 章节 | 源码位置 |
+|---|---|---|
+| HiPPO-LegS 矩阵 | HiPPO paper Theorem 2 (arxiv 2008.07669) | `s4` 仓库 `src/models/hippo/transition.py` |
+| NPLR 参数化 | S4 paper §3.2 Eq.(3) | `s4` 仓库 `src/models/s4/s4.py` |
+| 对角化简(S4D) | S4D paper (arxiv 2206.11893) | `s4` 仓库 `src/models/s4/s4d.py` |
+| Mamba 沿用 S4D 的 $A$ 形式 | Mamba paper §3.5 | `mamba_ssm/modules/mamba_simple.py` 中 `A_log = log(A_real)` |
+| Skip connection $D$ | S4 paper Eq.(1) | `mamba_ssm/modules/mamba_simple.py` 中 `self.D` |

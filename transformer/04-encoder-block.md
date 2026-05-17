@@ -418,6 +418,19 @@ class TransformerEncoder(nn.Module):
 3. LayerNorm 为什么适合序列模型?如果用 BatchNorm 会有什么问题?
 4. Pre-LN 的残差路径为什么比 Post-LN 更利于深层训练?
 
+<details>
+<summary><b>参考思路</b></summary>
+
+**1.** 梯度反向传播要穿过 24 次非线性变换,**梯度消失**(或爆炸)概率极高。残差让 $\partial y / \partial x = I + \partial F/\partial x$,即使 $F$ 学坏了,$I$ 也能让梯度直传到底层。没有残差时深层网络几乎学不动 — 这也是 ResNet 出现前深度被限制在 ~20 层的根本原因。
+
+**2.** **中间升维提供更大的"思考空间"**。一个 $d \to d$ 线性 + ReLU + $d \to d$ 线性,容量受限于 $d$ 维度;升到 $4d$ 后,ReLU 之前的特征可以更"丰富",经过非线性切片再压回。直观理解:高维空间里非线性的表达能力更强。实证上 $d_{\text{ff}} \approx 4 d_{\text{model}}$ 是甜点。
+
+**3.** BatchNorm 在 batch 维度统计均值/方差。**问题**:(a) 推理时序列长度可变、batch 可能小到 1,统计量不稳;(b) 自回归生成时,新生成的 token 没有"对照样本",BatchNorm 无意义;(c) 不同位置的 token 分布差异大,共享统计量反而有害。LayerNorm 在**每个 token 内部**归一化,完全独立于 batch 和位置,这些问题都没有。
+
+**4.** Post-LN: $y = \text{LN}(x + F(x))$,梯度 $\partial y / \partial x$ 要经过 LayerNorm 的 Jacobian(缩放 + 减均值),信号被反复重整。Pre-LN: $y = x + F(\text{LN}(x))$,**残差路径上 $x$ 直接相加,不经过任何 LayerNorm**,梯度可以完全无衰减地穿过几十层。这就是 Pre-LN 在 24+ 层模型(GPT, LLaMA)上更稳定的关键原因。
+
+</details>
+
 ---
 
 ## 4.15 下一节预告

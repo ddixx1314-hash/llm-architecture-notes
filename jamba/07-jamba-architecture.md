@@ -75,6 +75,14 @@ Jamba 论文中的一个关键设计是 Attention 层和 Mamba 层按稀疏比�
 每 8 个序列混合层里,大约 1 个 Attention,7 个 Mamba
 ```
 
+> ⚠️ **关于 1:7 这个数字**
+>
+> "1:7 attention:mamba" 来自 **Jamba 1.0/1.5 论文**(arxiv 2403.19887, Figure 1)。本节后面"52B total / 12B active"也是 **Jamba 1.5 Mini** 的公开数字。
+>
+> **Jamba 2.0 Mini**(`jamba-mini-2-2026-01`)同样是 52B/12B/256K,但 AI21 没有公开它的具体层数、a:m 比例和 MoE 配置——可能延用 1.5 的结构,也可能调整过。需要确切数字时,以 AI21 模型卡或新论文为准,不要把这里的 1:7 当作 Jamba 2.0 的官方配置。
+>
+> 本节用 1:7 作为"代表性配置"来讲设计原理,这些原理(混合比例、MoE 稀疏激活)在 2.0 中应该仍然成立。
+
 <div align="center"><img src="images/jamba-block-architecture.png" width="70%"></div>
 
 图:Jamba block 示例:以 $a:m=1:7$ 混合 Attention 和 Mamba,并每隔 $e=2$ 层使用 MoE。来源:Lieber et al., 2024, *Jamba: A Hybrid Transformer-Mamba Language Model*, Figure 1。
@@ -225,3 +233,34 @@ Jamba 不是抛弃 Transformer。
 - 混合架构的工程取舍是什么?
 
 → [第 8 节:Jamba 训练与推理](08-jamba-training-inference.md)
+
+---
+
+## 7.12 思考题(可选)
+
+1. Jamba 论文的消融实验显示:即使把 Attention 层的比例降到 1/8,长上下文召回质量仍然接近全 Attention。直觉上这是为什么?少量 Attention 层在做什么"独特"的工作?
+2. MoE 放在 Mamba 层之后还是 Attention 层之后?Jamba 怎么决定的?如果只在某一类层后加 MoE,会有什么效果?
+3. 如果让你自己设计一个"长上下文 + 高质量"的混合模型,你会怎么选 a:m 比例和 MoE 频率?有哪些自变量需要权衡?
+
+<details>
+<summary><b>参考思路</b>(先自己想 3-5 分钟再展开)</summary>
+
+**1.** 关键直觉:**Mamba 层是高带宽传输介质,Attention 层是稀缺的精确寻址点**。Mamba 把任意位置的信息"摘要"传递到任何后续位置,Attention 层负责在某些关键位置做"内容寻址"——只要这种"精确寻址点"在整个深度里出现几次,模型就能完成 Needle-in-a-Haystack 类任务。类比:Mamba 是邮政系统(总能把信送到附近),Attention 是 GPS 定位(偶尔需要精确坐标)。只要 GPS 还能用,不需要每个路口都装。
+
+**2.** Jamba 论文里 MoE 是**每 2 个 block 加一次**,不区分这个 block 是 Mamba 还是 Attention。直觉上,FFN/MoE 是**通道混合**,跟前面的"序列混合方式"无关——所以放在哪类层后都可以。但工程上,MoE 后接 Attention 层时,KV Cache 的内存压力和 MoE 路由的 all-to-all 通信可能在同一阶段争抢带宽,有可能要错开。
+
+**3.** 自变量:(a) 目标上下文长度 → 长上下文偏向更高 m:a 比例;(b) 目标任务类型 → 召回密集型(代码、检索)需要更多 Attention,生成密集型可以少;(c) 推理硬件 → 显存大可以全 KV,显存小用 Mamba 多;(d) 训练算力预算 → MoE 总参数大但激活少,适合算力受限场景;(e) 模型规模 → 小模型可能 MoE 不划算,通信成本压倒激活节约。Jamba 的 1:7 + 每 2 层 MoE 是大模型场景下的一个工程平衡点,不是普适最优。
+
+</details>
+
+---
+
+## 7.13 论文/源码对照
+
+| 概念 | 论文符号 / 章节 | 源码位置 |
+|---|---|---|
+| Jamba block 结构 | Jamba paper §3 Figure 1, Algorithm 1 | HuggingFace `transformers.models.jamba.modeling_jamba.JambaModel` |
+| Attention layer 配比 ($a:m=1:7$) | Jamba paper §3.1 | `JambaConfig.attn_layer_offset` / `attn_layer_period` |
+| MoE 频率 ($e=2$) | Jamba paper §3.1 | `JambaConfig.expert_layer_offset` / `expert_layer_period` |
+| Total / Active 参数划分 | Jamba paper Table 1 (1.5B/12B) | 模型卡参数表 |
+| 256K 上下文 | Jamba 1.5 / 2.0 模型卡 | 推理时 `max_position_embeddings` 配置 |

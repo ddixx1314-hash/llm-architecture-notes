@@ -74,10 +74,16 @@ $$
 u(t-\Delta+\tau)=u_t,\quad 0\leq \tau \leq \Delta
 $$
 
-代入积分:
+代入 2.2 节积分:
 
 $$
 x_t=e^{A\Delta}x_{t-1}+\left(\int_0^\Delta e^{A(\Delta-\tau)}d\tau\right)Bu_t
+$$
+
+做变量代换 $s=\Delta-\tau$(对 $A$ 可逆时把积分换成更标准形式):
+
+$$
+\int_0^\Delta e^{A(\Delta-\tau)}d\tau \;=\; \int_0^\Delta e^{As}\,ds
 $$
 
 于是:
@@ -87,16 +93,24 @@ $$
 $$
 
 $$
-\bar{B}=\left(\int_0^\Delta e^{A\tau}d\tau\right)B
+\bar{B}=\left(\int_0^\Delta e^{As}\,ds\right)B
 $$
 
-如果 $A$ 可逆:
+如果 $A$ 可逆,积分有闭式:
 
 $$
 \bar{B}=A^{-1}(e^{A\Delta}-I)B
 $$
 
 这就是常见的 ZOH 离散化公式。
+
+> 🔧 **Mamba 源码里的一阶近似**
+>
+> Mamba 实现中 $A$ 是 diagonal、$\Delta$ 通常很小,所以源码常用一阶 Taylor 展开把 $\bar{B}$ 近似为:
+>
+> $$\bar{B}_t \approx \Delta_t \cdot B_t$$
+>
+> 推导:把 $e^{A\Delta} \approx I + A\Delta$ 代入 $\bar{B}=A^{-1}(e^{A\Delta}-I)B$,得到 $\bar{B} \approx A^{-1}\cdot A\Delta\cdot B = \Delta B$。这避免了 $A^{-1}$ 的数值问题,代价是 $A$ 不再精确"出现在" $\bar{B}$ 里。原论文公式叫 *"simplified discretization"*,在 `mamba-ssm/ops/selective_scan_interface.py` 里就能看到。
 
 ---
 
@@ -120,6 +134,10 @@ $$
 - $\Delta$ 大:$e^{a\Delta}$ 更小,旧状态衰减更快
 
 所以 $\Delta$ 可以理解成当前 token 的"时间跨度"。
+
+<div align="center"><img src="images/delta-controls-memory.png" width="92%"></div>
+
+图:固定连续衰减率 $a=-1$,左:状态保留率 $\bar{A}=e^{a\Delta}$ 随 $\Delta$ 单调下降;右:单脉冲注入后,小 $\Delta$ 让记忆持续 20+ 步,大 $\Delta$ 几步就消失。**Mamba 让 $\Delta_t$ 依赖输入,等于给模型一个"per-token 记忆旋钮"**。脚本见 [scripts/generate_figures.py](scripts/generate_figures.py)。
 
 Mamba 让 $\Delta$ 依赖输入,这会非常关键。
 
@@ -231,16 +249,26 @@ $$
 import torch
 
 def run_ssm(u, A_bar, B_bar, C):
-    # u: (L,)
-    # A_bar: (N, N)
-    # B_bar: (N,)
-    # C: (N,)
+    """
+    朴素的离散 SSM 串行递推 (用于理解,不用于训练)。
+
+    Args:
+        u:     (L,)      标量输入序列
+        A_bar: (N, N)    离散化后的状态转移矩阵
+        B_bar: (N,)      离散化后的输入投影
+        C:     (N,)      状态读出向量
+
+    Returns:
+        ys:    (L,)      输出序列
+    """
     N = A_bar.size(0)
-    x = torch.zeros(N, device=u.device)
+    x = torch.zeros(N, device=u.device)   # 初始状态 x_0 = 0
     ys = []
 
     for t in range(u.size(0)):
+        # 一步递推:x_t = A_bar @ x_{t-1} + B_bar * u_t
         x = A_bar @ x + B_bar * u[t]
+        # 读出:y_t = C^T x_t
         y = C @ x
         ys.append(y)
 
@@ -248,6 +276,10 @@ def run_ssm(u, A_bar, B_bar, C):
 ```
 
 这个循环就是 SSM 最朴素的推理形式。
+
+⚠️ **训练时不要这样写**:这段代码在序列维上是 `for` 循环,无法并行,训练 4K 长度都很慢。真实训练用的是:
+- **固定参数 SSM**(S4): 把 SSM 等价转换为卷积,用 FFT 在 $O(L \log L)$ 时间并行
+- **选择性 SSM**(Mamba): 用 parallel prefix scan 在 $O(L \log L)$ 时间并行(见第 5 节)
 
 ---
 
@@ -271,3 +303,38 @@ def run_ssm(u, A_bar, B_bar, C):
 - Mamba 和 S4 的关系是什么?
 
 → [第 3 节:S4 与 HiPPO](03-s4-hippo.md)
+
+---
+
+## 2.12 思考题(可选)
+
+1. ZOH 假设"间隔内输入保持常数",这显然在采样真实信号时不严格成立。它带来什么近似误差?和"线性插值"假设(双线性变换)相比哪个更准?
+2. Mamba 让 $\Delta_t$ 依赖输入。如果某 token 给出特别大的 $\Delta_t$,会发生什么?特别小呢?
+3. 如果两个相邻 token 的 $\Delta, B, C$ 完全相同,Mamba 在这两步上的行为和固定 SSM 有区别吗?为什么?
+
+<details>
+<summary><b>参考思路</b>(先自己想 3-5 分钟再展开)</summary>
+
+**1.** ZOH 默认 $u(\tau) \equiv u_t$ 整个区间,所以系统对 $[t-\Delta, t]$ 内的输入变化"看不见",误差是 $O(\Delta)$。双线性变换隐含线性插值,误差是 $O(\Delta^2)$,理论上更准。但在深度学习里,$\Delta$ 是可学习的、$B, C$ 是可学习的,模型可以"自适应"补偿离散化误差——所以 Mamba 选 ZOH 配上一阶近似 $\bar{B} \approx \Delta B$,实现简单数值稳定,精度不是瓶颈。
+
+**2.** 看 $\bar{A}_t = e^{\Delta_t A}$:
+- $\Delta_t$ 很大 → $e^{\Delta_t A}$ 接近 0(假设 $A$ 实部为负)→ 几乎完全丢弃旧状态、把新输入写进去 → "重置 + 写入"
+- $\Delta_t$ 很小 → $e^{\Delta_t A}$ 接近 $I$ → 状态几乎不动 → "跳过这个 token"
+
+所以 $\Delta_t$ 起到了一个非常类似 LSTM 遗忘门的角色,只是用连续时间步长的形式表达。
+
+**3.** **没有区别**。Mamba 的"选择性"只来自参数随输入变化,如果两步的参数恰好相同,这两步就退化成普通 SSM 的两次相同操作。换句话说,Mamba 在 $\Delta, B, C$ 不变的区段上**就是固定 SSM**,优势完全来自"哪些 token 的参数会变化"——这是它和 S4 在数学上的精确区别。
+
+</details>
+
+---
+
+## 2.13 论文/源码对照
+
+| 概念 | 论文符号 / 章节 | 源码位置 |
+|---|---|---|
+| ZOH 离散化 $\bar{A}, \bar{B}$ | Mamba paper §2.1 Eq.(4); S4 paper §2.2 | `mamba_ssm/ops/triton/selective_state_update.py` 中 `dt`、`A_log` |
+| 一阶近似 $\bar{B}_t \approx \Delta_t B_t$ | Mamba paper "simplified discretization" | `selective_scan_interface.py` 中 `is_simplified=True` |
+| 双线性 / Tustin 变换 | S4 paper Appendix; 经典控制论 | (Mamba 未使用) |
+| 离散卷积视角 $K_k = C\bar{A}^k\bar{B}$ | S4 paper §3.2 | S4 官方实现 `s4d.py` (FFT 卷积) |
+| Selective scan 不能用固定卷积 | Mamba paper §3.2 | `selective_scan_fn` 替代 FFT |

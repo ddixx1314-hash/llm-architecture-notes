@@ -1,2 +1,7 @@
 *.tar.gz
 *.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

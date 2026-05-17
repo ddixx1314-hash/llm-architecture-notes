@@ -433,6 +433,21 @@ linear vocab head
 3. Cross-attention 的注意力矩阵形状为什么是 $m \times n$,而不是 $n \times n$?
 4. Decoder-only 模型为什么也叫语言模型?它和 Encoder-Decoder 翻译模型的训练目标有什么不同?
 
+<details>
+<summary><b>参考思路</b></summary>
+
+**1.** 训练 loss 会**异常低**(模型可以"作弊":预测位置 $t$ 时直接看位置 $t$ 的真实答案)。推理时模型没有未来 token 可看,**输出垃圾** — 训练和推理分布完全不一致。这是个典型的"数据泄漏"陷阱。
+
+**2.** 两个原因:
+- **数值正确性**:softmax 之后置 0 会**破坏归一化**($\sum_j \alpha_{ij}$ 不再等于 1),剩余权重之和小于 1;要再次归一化才能用。
+- **数学等价**:softmax 之前加 $-\infty$,经过 $\exp(-\infty)=0$,自然得到 0 概率,**剩余位置的概率自动归一**(分母只包含未 mask 位置)。一步完成,且数值稳定。
+
+**3.** Query 来自 Decoder(长度 $m$),Key/Value 来自 Encoder(长度 $n$)。$QK^T$ 形状是 (m, d) × (d, n) = (m, n)。**含义**:Decoder 每个目标位置(m 个)去 Encoder 的所有源位置(n 个)里查找信息。$m$ 和 $n$ 可以不同(英译中:英文 5 词 → 中文 6 词)。
+
+**4.** 因为它的训练目标 $P(x_t | x_{<t})$ 就是**语言模型的标准定义** — 预测下一个词。Encoder-Decoder 模型的目标是 $P(y | x)$(条件生成,如英→中翻译),需要两个不同序列。Decoder-only 把两者统一成 $P(\text{whole sequence})$,把 prompt 和回答都放在同一条序列里,用 causal mask 自然实现条件生成。这种统一性是 GPT 范式胜出的关键。
+
+</details>
+
 ---
 
 ## 5.17 下一节预告

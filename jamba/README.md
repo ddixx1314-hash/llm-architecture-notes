@@ -56,3 +56,25 @@ Jamba 2.0 mini 规格:**52B 总参数 / 12B 激活参数**, **256K 上下文**, 
 - **HiPPO 论文**: Gu et al., 2020, *HiPPO: Recurrent Memory with Optimal Polynomial Projections* ([本地 PDF](references/hippo-recurrent-memory-polynomial-projections-2008.07669.pdf), [arxiv 2008.07669](https://arxiv.org/abs/2008.07669))
 - **官方实现**: [state-spaces/mamba](https://github.com/state-spaces/mamba)
 - **AI21 模型卡**: https://docs.ai21.com/docs/jamba-foundation-models
+
+## 配套脚本与可视化
+
+笔记里的图和小型可运行实现都在 [scripts/](scripts/):
+
+| 脚本 | 作用 | 涉及章节 |
+|---|---|---|
+| [scripts/generate_figures.py](scripts/generate_figures.py) | matplotlib 生成 4 张可视化图(SSM 状态演化、Δ 控制记忆、prefix scan 对比、cache 增长) | §1.5, §2.4, §5.4, §8.5 |
+| [scripts/mini_mamba.py](scripts/mini_mamba.py) | 端到端可跑的微型 Mamba(~60K 参数,Sonnet 18 训练 ~1 min CPU,sanity check 验证 scan == recurrent step) | §1–§5 |
+| [scripts/mini_jamba.py](scripts/mini_jamba.py) | 混合架构演示:4 层(3 Mamba + 1 Attention),其中 2 层用 Top-2-of-4 MoE,共存的 KV cache + SSM state,一致性验证全部 4 类层 | §6–§8 |
+
+运行:
+
+```bash
+conda activate learning                # 使用主目录共享的 conda 环境
+cd jamba/
+python scripts/generate_figures.py     # 生成 images/*.png
+python scripts/mini_mamba.py           # ~1 分钟 CPU
+python scripts/mini_jamba.py           # ~5-10 分钟 CPU
+```
+
+依赖:`torch` + `matplotlib` + `numpy`,全部包含在 [learning/ 主目录的共享 conda 环境](../README.md#-环境设置)中。无 `mamba-ssm`、`flash-attn` 等高性能库——naive Python scan,目的是清晰而非快。

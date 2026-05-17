@@ -1,0 +1,16 @@
+name: learning
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch=2.5
+  - cpuonly         # 删除这行就能装 GPU 版(再加 pytorch-cuda=12.1)
+  - numpy
+  - matplotlib
+
+# 用法:
+#   conda env create -f environment.yml      # 创建环境(精简版,solver 自动决定子依赖版本)
+#   conda env create -f environment.lock.yml # 精确复现(锁所有传递依赖到具体版本)
+#   conda activate learning
+#   conda env update -f environment.yml      # 修改本文件后同步环境

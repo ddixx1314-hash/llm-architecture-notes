@@ -71,6 +71,16 @@ $$
 C \in \mathbb{R}^{1 \times N}
 $$
 
+> 💡 **关于标量输入的简化**
+>
+> 这里我们把输入 $u(t)$ 写成标量,主要是为了让数学清爽。**真实 Mamba 处理 $D$ 维 embedding 序列**:
+>
+> $$u \in \mathbb{R}^{B \times L \times D}$$
+>
+> 实现上是**每个 channel $d$ 独立跑一个 $N$ 维 SSM**,通道间不混合(通道混合留给 block 外的 Linear 完成)。所以单层内部状态张量的真实形状是 $(B, L, D, N)$。
+>
+> 本节后续的所有公式都可以看作"某个 channel 内部的子系统"。我们会在第 4 节再展开多通道的细节。
+
 ---
 
 ## 1.3 三个矩阵分别干什么?
@@ -143,6 +153,22 @@ $$
 x(t)=e^{At}x(0)
 $$
 
+含义:**当前状态 = 矩阵指数 $e^{At}$ 作用在初始状态 $x(0)$ 上**。也就是说,矩阵指数 $e^{At}$ 就是从 $0$ 时刻到 $t$ 时刻的"状态传播算子"。
+
+### 严格推导:一阶线性齐次 ODE 的解
+
+> **假设**:$A \in \mathbb{R}^{N \times N}$ 是常矩阵(不随 $t$ 变化),$x(t) \in \mathbb{R}^N$,初值 $x(0)$ 已知。
+>
+> **推导**:把 $e^{At}$ 按定义展开:
+> $$e^{At} = \sum_{k=0}^{\infty} \frac{(At)^k}{k!} = I + At + \frac{(At)^2}{2!} + \cdots$$
+> 逐项求导(级数一致收敛):
+> $$\frac{d}{dt}e^{At} = A + A^2 t + \frac{A^3 t^2}{2!} + \cdots = A \cdot e^{At}$$
+> 所以 $x(t) = e^{At} x(0)$ 满足:
+> $$\frac{dx}{dt} = A e^{At} x(0) = A x(t) \;\checkmark$$
+> 且初值正确:$x(0) = e^{0} x(0) = I \cdot x(0) = x(0)$。
+>
+> **结论**:$x(t) = e^{At} x(0)$ 就是这个 ODE 的唯一解。
+
 这里的矩阵指数定义为:
 
 $$
@@ -150,6 +176,12 @@ e^{At}=I+At+\frac{(At)^2}{2!}+\frac{(At)^3}{3!}+\cdots
 $$
 
 它是标量指数函数 $e^{at}$ 的矩阵版本。
+
+📌 **直观**:如果把 $A$ 做特征分解 $A = V \Lambda V^{-1}$,则 $e^{At} = V e^{\Lambda t} V^{-1}$——也就是**沿 $A$ 的每个特征方向各自做标量指数衰减/增长**。所以 $A$ 的特征值控制了状态各个模式的演化时间常数,这是后面 HiPPO/S4 选择 $A$ 时的核心考虑。
+
+<div align="center"><img src="images/ssm-state-evolution.png" width="92%"></div>
+
+图:三种典型特征值下 $x(t)=e^{At}x(0)$ 的演化——左:实部为负 → 稳定衰减(SSM 想要的);中:纯虚数 → 周期振荡;右:实部为正 → 指数爆炸(坏初始化)。脚本见 [scripts/generate_figures.py](scripts/generate_figures.py)。
 
 ---
 
@@ -266,3 +298,33 @@ $$
 - 为什么步长 $\Delta$ 很关键?
 
 → [第 2 节:SSM 离散化](02-ssm-discretization.md)
+
+---
+
+## 1.11 思考题(可选)
+
+1. 如果 $A$ 是**反对称矩阵**($A^T = -A$),状态 $x(t)$ 会有什么行为?和稳定衰减(对角负实部)有什么本质区别?
+2. SSM 的"卷积视角"和 CNN 的卷积有什么相同和不同?它能写成 PyTorch 里的 `nn.Conv1d` 吗?
+3. 如果训练时把 $A$ 当作可学习参数,梯度反向传播会遇到什么困难?(提示:矩阵指数的导数)
+
+<details>
+<summary><b>参考思路</b>(先自己想 3-5 分钟再展开)</summary>
+
+**1.** 反对称矩阵的特征值是**纯虚数**,所以 $e^{At}$ 不衰减也不放大,而是**振荡**(类比简谐运动 $\frac{d^2 x}{dt^2} = -\omega^2 x$)。这种 SSM 适合周期性信号,但对单调衰减的"遗忘"行为不友好。S4D 系列通常把 $A$ 限制成**对角且实部为负**,既稳定又便于 $e^{A\Delta}$ 计算。
+
+**2.** SSM 的卷积核 $K_k = C\bar{A}^k\bar{B}$ 是一个**长度为 $L$、单通道、因果**的卷积核——参数不是直接学的,而是从 $(A, B, C)$ 推出来。CNN 的卷积核是直接参数化的、长度固定、跨通道的。SSM 等价于一个"参数化生成无限长卷积核"的方案。可以写成 Conv1d 但要 $L$ 长度的 kernel,显存大,所以 S4 用 FFT 加速。
+
+**3.** $\bar{A} = e^{A\Delta}$ 对 $A$ 的导数涉及 **矩阵指数的 Fréchet 导数**,一般形式很复杂。S4 和 Mamba 都把 $A$ 限制成**对角**(或 diagonal-plus-low-rank, DPLR),让 $e^{A\Delta}$ 变成逐元素 $\exp$,导数就回到简单标量,可以直接 backprop。这是工程上的关键妥协。
+
+</details>
+
+---
+
+## 1.12 论文/源码对照
+
+| 概念 | 论文符号 / 章节 | 源码位置 |
+|---|---|---|
+| 连续 SSM $A, B, C$ | S4 paper §2, Eq.(1) | `mamba_ssm/modules/mamba_simple.py` 中 `A_log, D` |
+| 矩阵指数解 $x(t)=e^{At}x(0)$ | 控制论标准结论 | (通过 ZOH 离散化间接出现) |
+| 卷积核 $K(s)=Ce^{As}B$ | S4 paper §3.1 | `mamba_ssm/ops/triton/selective_state_update.py` |
+| 输入/状态/输出 ($u, x, y$) | Mamba paper §2.1 | 输入张量名通常是 `u`,状态名通常是 `ssm_state` |
