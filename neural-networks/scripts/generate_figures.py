@@ -1,5 +1,9 @@
 """Generate visualization figures for the foundational neural-network notes.
 
+The figures are original redrawn teaching diagrams. They intentionally do not
+copy figures from papers; see ../paper-figures.md for pointers to the original
+paper figures worth reading.
+
 Outputs are written to ../images/.
 
 Run:
@@ -19,6 +23,23 @@ HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "images"
 OUT.mkdir(exist_ok=True)
 
+COLORS = {
+    "blue": "#d8e8ff",
+    "blue_edge": "#2b5fb8",
+    "green": "#dff3df",
+    "green_edge": "#2a7a2a",
+    "orange": "#ffe4c8",
+    "orange_edge": "#b8762b",
+    "yellow": "#fff1c7",
+    "yellow_edge": "#b88700",
+    "purple": "#eadcff",
+    "purple_edge": "#6a38ad",
+    "red": "#ffe0d6",
+    "red_edge": "#d62728",
+    "gray": "#f4f4f4",
+    "gray_edge": "#666666",
+}
+
 
 def clean(ax):
     ax.set_xticks([])
@@ -26,246 +47,324 @@ def clean(ax):
     ax.spines[:].set_visible(False)
 
 
-def box(ax, xy, w, h, text, fc="#e8f0fe", ec="#3454d1", fs=10):
+def box(ax, xy, w, h, text, fc=None, ec=None, fs=10, weight="normal"):
+    fc = fc or COLORS["blue"]
+    ec = ec or COLORS["blue_edge"]
     rect = patches.FancyBboxPatch(
         xy,
         w,
         h,
-        boxstyle="round,pad=0.03,rounding_size=0.03",
-        linewidth=1.2,
+        boxstyle="round,pad=0.035,rounding_size=0.045",
+        linewidth=1.35,
         edgecolor=ec,
         facecolor=fc,
     )
     ax.add_patch(rect)
-    ax.text(xy[0] + w / 2, xy[1] + h / 2, text, ha="center", va="center", fontsize=fs)
+    ax.text(
+        xy[0] + w / 2,
+        xy[1] + h / 2,
+        text,
+        ha="center",
+        va="center",
+        fontsize=fs,
+        weight=weight,
+    )
     return rect
 
 
-def arrow(ax, start, end, color="#555", lw=1.7, style="->"):
+def circle(ax, xy, r, text, fc, ec, fs=10, weight="normal"):
+    circ = patches.Circle(xy, r, facecolor=fc, edgecolor=ec, linewidth=1.35, zorder=3)
+    ax.add_patch(circ)
+    ax.text(xy[0], xy[1], text, ha="center", va="center", fontsize=fs, weight=weight, zorder=4)
+    return circ
+
+
+def arrow(ax, start, end, color="#555", lw=1.65, style="->", rad=0.0):
     ax.annotate(
         "",
         xy=end,
         xytext=start,
-        arrowprops=dict(arrowstyle=style, color=color, lw=lw, shrinkA=4, shrinkB=4),
+        arrowprops=dict(
+            arrowstyle=style,
+            color=color,
+            lw=lw,
+            shrinkA=4,
+            shrinkB=4,
+            connectionstyle=f"arc3,rad={rad}",
+        ),
     )
 
 
+def save(fig, name):
+    out = OUT / name
+    fig.savefig(out, dpi=170, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {out}")
+
+
+def draw_tensor_stack(ax, x, y, w, h, depth, color, edge, label, dx=0.08, dy=0.08):
+    for k in range(depth - 1, -1, -1):
+        rect = patches.Rectangle(
+            (x + k * dx, y + k * dy),
+            w,
+            h,
+            facecolor=color,
+            edgecolor=edge,
+            linewidth=1.2,
+            alpha=0.95,
+        )
+        ax.add_patch(rect)
+    ax.text(x + w / 2 + (depth - 1) * dx / 2, y - 0.25, label, ha="center", fontsize=10)
+
+
 def figure_training_loop():
-    fig, ax = plt.subplots(figsize=(11, 4.2))
+    fig, ax = plt.subplots(figsize=(12, 4.6))
     clean(ax)
 
     items = [
-        ((0.4, 1.8), "batch\n(x, y)", "#d8e8ff"),
-        ((2.2, 1.8), "forward\nlogits = f(x)", "#dff3df"),
-        ((4.2, 1.8), "loss\nL(logits, y)", "#fff1c7"),
-        ((6.2, 1.8), "backward\ncompute grads", "#ffe0d6"),
-        ((8.3, 1.8), "optimizer.step\nupdate params", "#eadcff"),
+        ((0.4, 2.0), "mini-batch\nx, y", COLORS["blue"], COLORS["blue_edge"]),
+        ((2.25, 2.0), "forward\nlogits = f_theta(x)", COLORS["green"], COLORS["green_edge"]),
+        ((4.45, 2.0), "loss\nL(logits, y)", COLORS["yellow"], COLORS["yellow_edge"]),
+        ((6.4, 2.0), "backward\ngrad = dL/dtheta", COLORS["red"], COLORS["red_edge"]),
+        ((8.75, 2.0), "optimizer\nAdamW / SGD", COLORS["purple"], COLORS["purple_edge"]),
     ]
-    for xy, text, fc in items:
-        box(ax, xy, 1.45, 0.85, text, fc=fc, ec="#555")
+    for xy, text, fc, ec in items:
+        box(ax, xy, 1.45, 0.85, text, fc=fc, ec=ec, fs=9.5)
+    for i in range(len(items) - 1):
+        x0, y0 = items[i][0]
+        x1, y1 = items[i + 1][0]
+        arrow(ax, (x0 + 1.45, y0 + 0.43), (x1, y1 + 0.43), lw=1.8)
 
-    centers = [(x + 1.45, y + 0.42) for (x, y), _, _ in items]
-    for i in range(len(centers) - 1):
-        arrow(ax, centers[i], (items[i + 1][0][0], items[i + 1][0][1] + 0.42))
-
-    arrow(ax, (9.0, 1.75), (2.8, 1.65), color="#8a4fd3", lw=1.5, style="-|>")
-    ax.text(5.9, 1.35, "next mini-batch repeats the same loop", ha="center", fontsize=10, color="#6a38ad")
-    ax.text(5.2, 3.0, "A training step is a closed feedback loop", ha="center", fontsize=14, weight="bold")
-    ax.set_xlim(0, 10.2)
-    ax.set_ylim(1.0, 3.3)
-
-    out = OUT / "training-loop.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
+    box(ax, (8.7, 0.65), 1.55, 0.55, "theta <- theta - step", fc=COLORS["gray"], ec=COLORS["gray_edge"], fs=9)
+    arrow(ax, (9.5, 2.0), (9.5, 1.2), color=COLORS["purple_edge"], lw=1.6)
+    arrow(ax, (8.7, 0.93), (2.7, 1.95), color=COLORS["purple_edge"], lw=1.5, rad=0.25)
+    ax.text(5.5, 3.35, "Training loop: prediction, error signal, gradient, parameter update", ha="center", fontsize=14, weight="bold")
+    ax.text(5.5, 3.05, "The model improves because the loss sends feedback to every parameter through backpropagation", ha="center", fontsize=10, color="#444")
+    ax.set_xlim(0, 10.8)
+    ax.set_ylim(0.35, 3.7)
+    save(fig, "training-loop.png")
 
 
 def figure_cnn_convolution():
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4.2), gridspec_kw={"width_ratios": [1.1, 0.9, 1.1]})
-    ax0, ax1, ax2 = axes
-    for ax in axes:
-        clean(ax)
+    fig, ax = plt.subplots(figsize=(12, 5.2))
+    clean(ax)
+    ax.text(5.8, 4.55, "CNN convolution: local receptive fields + shared kernels + channel mixing", ha="center", fontsize=14, weight="bold")
 
-    img = np.zeros((7, 7))
-    img[1:6, 3] = 1
-    img[2:5, 2:5] += 0.25
-    ax0.imshow(img, cmap="Blues", vmin=0, vmax=1.25)
-    ax0.set_title("input image", fontsize=12)
-    rect = patches.Rectangle((2 - 0.5, 2 - 0.5), 3, 3, fill=False, edgecolor="#d62728", linewidth=2.5)
-    ax0.add_patch(rect)
-    for i in range(8):
-        ax0.axhline(i - 0.5, color="white", lw=0.8)
-        ax0.axvline(i - 0.5, color="white", lw=0.8)
+    draw_tensor_stack(ax, 0.7, 1.65, 1.75, 1.75, 3, COLORS["blue"], COLORS["blue_edge"], "input\nC_in x H x W")
+    rect = patches.Rectangle((1.1, 2.05), 0.75, 0.75, facecolor="none", edgecolor=COLORS["red_edge"], linewidth=2.2)
+    ax.add_patch(rect)
+    ax.text(1.5, 3.67, "same 3x3 window\nslides everywhere", ha="center", fontsize=9, color=COLORS["red_edge"])
+    arrow(ax, (1.5, 3.42), (1.5, 2.85), color=COLORS["red_edge"], lw=1.3)
 
-    kernel = np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]])
-    ax1.imshow(kernel, cmap="Oranges", vmin=0, vmax=1)
-    ax1.set_title("3x3 kernel", fontsize=12)
-    for i in range(4):
-        ax1.axhline(i - 0.5, color="white", lw=0.8)
-        ax1.axvline(i - 0.5, color="white", lw=0.8)
+    for i, y in enumerate([2.85, 2.0, 1.15]):
+        draw_tensor_stack(ax, 3.35, y, 0.82, 0.52, 3, COLORS["orange"], COLORS["orange_edge"], "" if i else "kernel bank\nC_out filters", dx=0.045, dy=0.045)
+    ax.text(3.85, 0.7, "each filter spans all input channels", ha="center", fontsize=9, color="#555")
 
-    feature = np.zeros((5, 5))
-    for i in range(5):
-        for j in range(5):
-            feature[i, j] = (img[i : i + 3, j : j + 3] * kernel).sum()
-    ax2.imshow(feature, cmap="Greens")
-    ax2.set_title("feature map", fontsize=12)
-    for i in range(6):
-        ax2.axhline(i - 0.5, color="white", lw=0.8)
-        ax2.axvline(i - 0.5, color="white", lw=0.8)
+    arrow(ax, (2.55, 2.52), (3.25, 2.52), color="#555", lw=1.8)
+    ax.text(2.9, 2.78, "dot product", ha="center", fontsize=9)
 
-    fig.text(0.5, 0.02, "The same small kernel slides across the image: local connection + weight sharing", ha="center", fontsize=11)
-    out = OUT / "cnn-convolution-overview.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
+    draw_tensor_stack(ax, 6.1, 1.55, 1.7, 1.7, 4, COLORS["green"], COLORS["green_edge"], "feature maps\nC_out x H_out x W_out")
+    arrow(ax, (4.4, 2.52), (6.0, 2.52), color="#555", lw=1.8)
+    ax.text(5.18, 2.84, "one map per filter", ha="center", fontsize=9)
+
+    box(ax, (8.7, 2.7), 2.3, 0.55, "parameter count", fc=COLORS["gray"], ec=COLORS["gray_edge"], fs=10, weight="bold")
+    box(ax, (8.7, 1.9), 2.3, 0.55, "C_out x C_in x k x k", fc="#ffffff", ec=COLORS["gray_edge"], fs=10)
+    box(ax, (8.7, 1.1), 2.3, 0.55, "independent of image H,W", fc=COLORS["yellow"], ec=COLORS["yellow_edge"], fs=10)
+    ax.set_xlim(0.1, 11.4)
+    ax.set_ylim(0.35, 4.9)
+    save(fig, "cnn-convolution-overview.png")
 
 
 def figure_rnn_unroll():
-    fig, ax = plt.subplots(figsize=(11, 4.2))
+    fig, ax = plt.subplots(figsize=(12, 4.8))
     clean(ax)
     n = 5
+    ax.text(5.7, 4.05, "RNN unrolled through time: same cell, serial hidden state", ha="center", fontsize=14, weight="bold")
+    ax.text(5.7, 3.75, "Every h_t waits for h_{t-1}; BPTT sends gradients back through the same chain", ha="center", fontsize=10, color="#444")
+
     for i in range(n):
-        x = 1 + i * 1.8
-        box(ax, (x, 0.4), 0.9, 0.55, f"x{i+1}", fc="#d8e8ff", ec="#2b5fb8")
-        box(ax, (x, 1.55), 0.9, 0.65, f"h{i+1}", fc="#ffe4c8", ec="#b8762b")
-        arrow(ax, (x + 0.45, 0.95), (x + 0.45, 1.55), color="#666")
+        x = 1.0 + i * 2.0
+        box(ax, (x, 0.65), 0.75, 0.45, f"$x_{i+1}$", fc=COLORS["blue"], ec=COLORS["blue_edge"], fs=12)
+        box(ax, (x - 0.08, 1.75), 0.92, 0.65, "RNN\ncell", fc=COLORS["orange"], ec=COLORS["orange_edge"], fs=9.5)
+        box(ax, (x, 2.9), 0.75, 0.45, f"$h_{i+1}$", fc=COLORS["green"], ec=COLORS["green_edge"], fs=12)
+        arrow(ax, (x + 0.37, 1.1), (x + 0.37, 1.75), color="#555")
+        arrow(ax, (x + 0.37, 2.4), (x + 0.37, 2.9), color=COLORS["green_edge"])
         if i > 0:
-            arrow(ax, (x - 0.9, 1.88), (x, 1.88), color="#b8762b", lw=2.2)
-    ax.text(4.6, 2.75, "RNN unrolled through time", ha="center", fontsize=14, weight="bold")
-    ax.text(4.6, 2.45, "h_t depends on h_{t-1}, so the sequence dimension is serial", ha="center", fontsize=10, color="#8a4d1f")
-    ax.set_xlim(0.4, 9.6)
-    ax.set_ylim(0.1, 3.1)
-    out = OUT / "rnn-unroll.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
+            arrow(ax, (x - 1.08, 2.08), (x - 0.08, 2.08), color=COLORS["orange_edge"], lw=2.1)
+        ax.text(x + 0.37, 1.52, "$W_x$", ha="center", fontsize=8, color="#555")
+    ax.text(4.98, 2.48, "shared $W_x, W_h$ at every step", ha="center", fontsize=10, color=COLORS["orange_edge"])
+    arrow(ax, (9.35, 3.55), (1.45, 3.55), color=COLORS["red_edge"], lw=1.6, style="-|>")
+    ax.text(5.4, 3.35, "gradient path for early tokens can become very long", ha="center", fontsize=9, color=COLORS["red_edge"])
+    ax.set_xlim(0.25, 10.6)
+    ax.set_ylim(0.3, 4.35)
+    save(fig, "rnn-unroll.png")
 
 
 def figure_lstm_gates():
-    fig, ax = plt.subplots(figsize=(12, 4.8))
+    fig, ax = plt.subplots(figsize=(13, 5.8))
     clean(ax)
-    box(ax, (0.4, 2.0), 1.0, 0.55, "c_{t-1}", fc="#fff1c7", ec="#b88700")
-    box(ax, (10.4, 2.0), 1.0, 0.55, "c_t", fc="#fff1c7", ec="#b88700")
-    arrow(ax, (1.4, 2.28), (10.4, 2.28), color="#b88700", lw=2.5)
-    ax.text(5.9, 2.65, "cell state: additive memory highway", ha="center", fontsize=11, color="#8c6500")
+    ax.text(6.4, 5.25, "LSTM cell: gates regulate long-term memory flow", ha="center", fontsize=14, weight="bold")
 
-    gate_info = [
-        (2.0, "forget gate\nf_t", "#ffe0d6"),
-        (4.1, "input gate\ni_t", "#dff3df"),
-        (6.2, "candidate\n~c_t", "#d8e8ff"),
-        (8.3, "output gate\no_t", "#eadcff"),
+    # Cell-state highway
+    box(ax, (0.55, 3.25), 0.95, 0.5, "$c_{t-1}$", fc=COLORS["yellow"], ec=COLORS["yellow_edge"], fs=12)
+    circle(ax, (3.1, 3.5), 0.22, "$\\times$", COLORS["gray"], COLORS["gray_edge"], fs=11)
+    circle(ax, (7.0, 3.5), 0.25, "$+$", COLORS["yellow"], COLORS["yellow_edge"], fs=13, weight="bold")
+    box(ax, (11.1, 3.25), 0.85, 0.5, "$c_t$", fc=COLORS["yellow"], ec=COLORS["yellow_edge"], fs=12)
+    arrow(ax, (1.5, 3.5), (2.88, 3.5), color=COLORS["yellow_edge"], lw=2.2)
+    arrow(ax, (3.32, 3.5), (6.75, 3.5), color=COLORS["yellow_edge"], lw=2.2)
+    arrow(ax, (7.25, 3.5), (11.1, 3.5), color=COLORS["yellow_edge"], lw=2.2)
+    ax.text(6.3, 3.9, "additive cell-state path helps preserve long-range information", ha="center", fontsize=10, color="#805d00")
+
+    # Input source
+    box(ax, (5.15, 0.35), 2.2, 0.48, "$u_t = [x_t ; h_{t-1}]$", fc=COLORS["gray"], ec=COLORS["gray_edge"], fs=11)
+
+    gates = [
+        ((2.15, 1.45), "$f_t=\\sigma(W_fu_t)$\nforget", COLORS["red"], COLORS["red_edge"], (3.1, 3.28)),
+        ((4.55, 1.45), "$i_t=\\sigma(W_iu_t)$\nwrite amount", COLORS["green"], COLORS["green_edge"], (5.35, 2.45)),
+        ((6.95, 1.45), "$\\tilde{c}_t=\\tanh(W_cu_t)$\ncandidate", COLORS["blue"], COLORS["blue_edge"], (6.65, 2.45)),
+        ((9.35, 1.45), "$o_t=\\sigma(W_ou_t)$\nexpose", COLORS["purple"], COLORS["purple_edge"], (10.2, 2.45)),
     ]
-    for x, text, fc in gate_info:
-        box(ax, (x, 0.8), 1.35, 0.75, text, fc=fc, ec="#555")
-        arrow(ax, (x + 0.68, 1.55), (x + 0.68, 2.03), color="#555")
+    for xy, text, fc, ec, target in gates:
+        box(ax, xy, 1.65, 0.75, text, fc=fc, ec=ec, fs=9.3)
+        arrow(ax, (6.25, 0.83), (xy[0] + 0.82, xy[1]), color="#777", lw=1.15)
+        arrow(ax, (xy[0] + 0.82, xy[1] + 0.75), target, color=ec, lw=1.45)
 
-    box(ax, (4.7, 0.05), 1.9, 0.45, "[x_t ; h_{t-1}]", fc="#f0f0f0", ec="#777")
-    for x, _, _ in gate_info:
-        arrow(ax, (5.65, 0.5), (x + 0.68, 0.8), color="#777", lw=1.2)
-    box(ax, (10.4, 0.8), 1.0, 0.55, "h_t", fc="#cfe5cf", ec="#2a7a2a")
-    arrow(ax, (9.0, 1.55), (10.35, 1.08), color="#6a38ad", lw=1.7)
-    arrow(ax, (10.9, 2.0), (10.9, 1.35), color="#2a7a2a", lw=1.7)
-    ax.text(6.0, 3.35, "LSTM gates control what to forget, write, and expose", ha="center", fontsize=14, weight="bold")
-    ax.set_xlim(0.1, 11.8)
-    ax.set_ylim(-0.1, 3.7)
-    out = OUT / "lstm-gates.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
+    circle(ax, (5.35, 2.7), 0.22, "$\\times$", COLORS["gray"], COLORS["gray_edge"], fs=11)
+    circle(ax, (6.65, 2.7), 0.22, "$\\times$", COLORS["gray"], COLORS["gray_edge"], fs=11)
+    arrow(ax, (5.55, 2.7), (6.43, 2.7), color=COLORS["green_edge"], lw=1.5)
+    arrow(ax, (6.65, 2.92), (6.9, 3.28), color=COLORS["green_edge"], lw=1.5)
+
+    circle(ax, (10.2, 2.7), 0.22, "$\\times$", COLORS["gray"], COLORS["gray_edge"], fs=11)
+    box(ax, (11.1, 1.6), 0.85, 0.5, "$h_t$", fc=COLORS["green"], ec=COLORS["green_edge"], fs=12)
+    arrow(ax, (11.5, 3.25), (10.35, 2.9), color=COLORS["yellow_edge"], lw=1.4, rad=0.12)
+    arrow(ax, (10.42, 2.7), (11.1, 1.85), color=COLORS["green_edge"], lw=1.4)
+
+    ax.text(5.4, 4.55, "$c_t=f_t\\odot c_{t-1}+i_t\\odot\\tilde{c}_t$", ha="center", fontsize=12, color="#333")
+    ax.text(10.4, 4.55, "$h_t=o_t\\odot\\tanh(c_t)$", ha="center", fontsize=12, color="#333")
+    ax.set_xlim(0.2, 12.4)
+    ax.set_ylim(0.1, 5.55)
+    save(fig, "lstm-gates.png")
 
 
 def figure_attention_bridge():
-    fig, ax = plt.subplots(figsize=(12, 4.6))
+    fig = plt.figure(figsize=(13, 5.2))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.35, 1.0])
+    ax = fig.add_subplot(gs[0, 0])
+    hm = fig.add_subplot(gs[0, 1])
     clean(ax)
-    enc_x = [1.2, 2.4, 3.6, 4.8]
+
+    ax.text(4.55, 4.5, "Seq2Seq attention: decoder query reads encoder annotations", ha="center", fontsize=13, weight="bold")
+    enc_x = [0.75, 1.75, 2.75, 3.75]
     for i, x in enumerate(enc_x, 1):
-        box(ax, (x, 0.55), 0.75, 0.5, f"x{i}", fc="#d8e8ff", ec="#2b5fb8")
-        box(ax, (x, 1.55), 0.75, 0.58, f"h{i}", fc="#dff3df", ec="#2a7a2a")
-        arrow(ax, (x + 0.38, 1.05), (x + 0.38, 1.55), color="#555")
-    box(ax, (8.4, 1.55), 1.0, 0.58, "s_t\nQuery", fc="#ffe4c8", ec="#b8762b")
-    box(ax, (6.5, 2.7), 1.55, 0.65, "softmax\nscores", fc="#fff1c7", ec="#b88700")
-    box(ax, (6.5, 0.35), 1.55, 0.65, "context c_t\nweighted sum", fc="#eadcff", ec="#6a38ad")
+        box(ax, (x, 0.5), 0.58, 0.42, f"$x_{i}$", fc=COLORS["blue"], ec=COLORS["blue_edge"], fs=10)
+        box(ax, (x, 1.45), 0.58, 0.5, f"$h_{i}$", fc=COLORS["green"], ec=COLORS["green_edge"], fs=10)
+        arrow(ax, (x + 0.29, 0.92), (x + 0.29, 1.45), color="#555")
+    box(ax, (6.9, 1.45), 0.95, 0.5, "$s_t$\nquery", fc=COLORS["orange"], ec=COLORS["orange_edge"], fs=10)
+    box(ax, (5.15, 3.15), 1.55, 0.55, "score + softmax\n$\\alpha_{t,j}$", fc=COLORS["yellow"], ec=COLORS["yellow_edge"], fs=10)
+    box(ax, (5.15, 0.45), 1.55, 0.55, "context $c_t$\nweighted sum", fc=COLORS["purple"], ec=COLORS["purple_edge"], fs=10)
     for x in enc_x:
-        arrow(ax, (x + 0.38, 2.13), (6.5, 3.03), color="#2a7a2a", lw=1.2)
-        arrow(ax, (7.25, 0.35), (x + 0.38, 1.55), color="#6a38ad", lw=1.0, style="<-")
-    arrow(ax, (8.4, 1.84), (8.05, 3.03), color="#b8762b", lw=1.5)
-    arrow(ax, (7.25, 2.7), (7.25, 1.0), color="#b88700", lw=1.7)
-    arrow(ax, (8.05, 0.68), (8.4, 1.65), color="#6a38ad", lw=1.4)
-    ax.text(5.6, 3.85, "Seq2Seq attention: decoder query reads encoder keys/values", ha="center", fontsize=14, weight="bold")
-    ax.text(5.6, 3.55, "This is the conceptual bridge to Transformer cross-attention and self-attention", ha="center", fontsize=10, color="#444")
-    ax.set_xlim(0.6, 10.0)
-    ax.set_ylim(0.0, 4.1)
-    out = OUT / "seq2seq-attention-bridge.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
+        arrow(ax, (x + 0.29, 1.95), (5.15, 3.43), color=COLORS["green_edge"], lw=1.05)
+        arrow(ax, (5.85, 1.0), (x + 0.29, 1.45), color=COLORS["purple_edge"], lw=1.0, style="<-")
+    arrow(ax, (6.9, 1.75), (6.65, 3.43), color=COLORS["orange_edge"], lw=1.4)
+    arrow(ax, (5.92, 3.15), (5.92, 1.0), color=COLORS["yellow_edge"], lw=1.5)
+    arrow(ax, (6.7, 0.72), (6.9, 1.55), color=COLORS["purple_edge"], lw=1.2)
+    ax.text(4.4, 4.2, "Bahdanau-style soft alignment removes the fixed-vector bottleneck", ha="center", fontsize=9.5, color="#444")
+    ax.set_xlim(0.25, 8.2)
+    ax.set_ylim(0.15, 4.8)
+
+    src = ["the", "cat", "sat", "."]
+    tgt = ["le", "chat", "assis", "."]
+    weights = np.array(
+        [
+            [0.72, 0.15, 0.08, 0.05],
+            [0.07, 0.78, 0.11, 0.04],
+            [0.05, 0.18, 0.70, 0.07],
+            [0.05, 0.06, 0.10, 0.79],
+        ]
+    )
+    im = hm.imshow(weights, cmap="YlGnBu", vmin=0, vmax=1)
+    hm.set_title("alignment weights $\\alpha_{t,j}$", fontsize=12)
+    hm.set_xticks(np.arange(len(src)), labels=src, fontsize=9)
+    hm.set_yticks(np.arange(len(tgt)), labels=tgt, fontsize=9)
+    hm.set_xlabel("source positions", fontsize=10)
+    hm.set_ylabel("target step", fontsize=10)
+    for i in range(weights.shape[0]):
+        for j in range(weights.shape[1]):
+            hm.text(j, i, f"{weights[i, j]:.2f}", ha="center", va="center", fontsize=8, color="#222")
+    fig.colorbar(im, ax=hm, fraction=0.046, pad=0.04)
+    save(fig, "seq2seq-attention-bridge.png")
 
 
 def figure_gnn_message_passing():
-    fig, ax = plt.subplots(figsize=(8.5, 6))
-    clean(ax)
+    fig, axes = plt.subplots(1, 3, figsize=(13, 5))
+    layers = ["input features\n$H^{(0)}$", "1-hop mixed\n$H^{(1)}$", "2-hop mixed\n$H^{(2)}$"]
     pos = {
-        "v": (0.0, 0.0),
-        "a": (-1.7, 1.1),
-        "b": (1.7, 1.1),
-        "c": (-1.6, -1.2),
-        "d": (1.5, -1.25),
-        "e": (0.0, 2.0),
+        0: (0.0, 0.0),
+        1: (-1.1, 0.75),
+        2: (1.1, 0.75),
+        3: (-1.05, -0.9),
+        4: (1.05, -0.9),
+        5: (0.0, 1.65),
     }
-    edges = [("a", "v"), ("b", "v"), ("c", "v"), ("d", "v"), ("e", "a"), ("e", "b")]
-    for u, v in edges:
-        x0, y0 = pos[u]
-        x1, y1 = pos[v]
-        ax.plot([x0, x1], [y0, y1], color="#aaa", lw=1.5, zorder=1)
-    for name, (x, y) in pos.items():
-        color = "#ffe4c8" if name == "v" else "#d8e8ff"
-        edge = "#b8762b" if name == "v" else "#2b5fb8"
-        circ = patches.Circle((x, y), 0.33, facecolor=color, edgecolor=edge, linewidth=1.4, zorder=3)
-        ax.add_patch(circ)
-        ax.text(x, y, name, ha="center", va="center", fontsize=12, zorder=4)
-    for name in ["a", "b", "c", "d"]:
-        x0, y0 = pos[name]
-        x1, y1 = pos["v"]
-        arrow(ax, (x0, y0), (x1, y1), color="#2a7a2a", lw=1.7)
-    box(ax, (-1.05, -2.25), 2.1, 0.55, "aggregate neighbor messages", fc="#dff3df", ec="#2a7a2a")
-    arrow(ax, (0, -1.85), (0, -0.35), color="#2a7a2a", lw=1.8)
-    ax.text(0, 2.75, "GNN message passing", ha="center", fontsize=14, weight="bold")
-    ax.text(0, 2.45, "node v updates its representation from local neighbors", ha="center", fontsize=10, color="#444")
-    ax.set_xlim(-2.7, 2.7)
-    ax.set_ylim(-2.65, 3.0)
-    out = OUT / "gnn-message-passing.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
+    edges = [(0, 1), (0, 2), (0, 3), (0, 4), (1, 5), (2, 5)]
+    for layer, ax in enumerate(axes):
+        clean(ax)
+        ax.set_title(layers[layer], fontsize=12, weight="bold")
+        for u, v in edges:
+            ax.plot([pos[u][0], pos[v][0]], [pos[u][1], pos[v][1]], color="#b7b7b7", lw=1.4, zorder=1)
+        for node, (x, y) in pos.items():
+            highlight = node == 0 or (layer >= 1 and node in [1, 2, 3, 4]) or (layer >= 2 and node == 5)
+            fc = COLORS["orange"] if node == 0 else (COLORS["green"] if highlight else COLORS["blue"])
+            ec = COLORS["orange_edge"] if node == 0 else (COLORS["green_edge"] if highlight else COLORS["blue_edge"])
+            circle(ax, (x, y), 0.23, str(node), fc, ec, fs=9)
+        if layer == 1:
+            for n in [1, 2, 3, 4]:
+                arrow(ax, pos[n], pos[0], color=COLORS["green_edge"], lw=1.5)
+        if layer == 2:
+            arrow(ax, pos[5], pos[1], color=COLORS["green_edge"], lw=1.2)
+            arrow(ax, pos[5], pos[2], color=COLORS["green_edge"], lw=1.2)
+            for n in [1, 2, 3, 4]:
+                arrow(ax, pos[n], pos[0], color=COLORS["green_edge"], lw=1.2)
+        ax.set_xlim(-1.75, 1.75)
+        ax.set_ylim(-1.35, 2.0)
+    fig.suptitle("GCN intuition: each layer expands the receptive field by one graph hop", fontsize=14, weight="bold", y=1.02)
+    save(fig, "gnn-message-passing.png")
 
 
 def figure_modern_cnn_blocks():
-    fig, ax = plt.subplots(figsize=(12, 4.4))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.8), gridspec_kw={"width_ratios": [1.1, 1.0]})
+    ax, ax2 = axes
     clean(ax)
-    # ResNet block
-    box(ax, (0.5, 1.8), 0.8, 0.5, "x", fc="#f0f0f0", ec="#777")
-    box(ax, (2.0, 1.8), 1.1, 0.5, "3x3 conv", fc="#d8e8ff", ec="#2b5fb8")
-    box(ax, (3.7, 1.8), 1.1, 0.5, "3x3 conv", fc="#d8e8ff", ec="#2b5fb8")
-    box(ax, (5.4, 1.8), 0.8, 0.5, "+", fc="#fff1c7", ec="#b88700")
-    box(ax, (6.9, 1.8), 1.0, 0.5, "ReLU", fc="#dff3df", ec="#2a7a2a")
-    for s, e in [((1.3, 2.05), (2.0, 2.05)), ((3.1, 2.05), (3.7, 2.05)), ((4.8, 2.05), (5.4, 2.05)), ((6.2, 2.05), (6.9, 2.05))]:
+    clean(ax2)
+    ax.text(3.9, 3.95, "ResNet block: learn a residual correction", ha="center", fontsize=13, weight="bold")
+    box(ax, (0.35, 2.0), 0.65, 0.45, "$x$", fc=COLORS["gray"], ec=COLORS["gray_edge"], fs=11)
+    box(ax, (1.55, 2.0), 1.0, 0.45, "3x3\nconv", fc=COLORS["blue"], ec=COLORS["blue_edge"], fs=9)
+    box(ax, (3.0, 2.0), 1.0, 0.45, "BN\nReLU", fc=COLORS["green"], ec=COLORS["green_edge"], fs=9)
+    box(ax, (4.45, 2.0), 1.0, 0.45, "3x3\nconv", fc=COLORS["blue"], ec=COLORS["blue_edge"], fs=9)
+    circle(ax, (6.2, 2.23), 0.24, "$+$", COLORS["yellow"], COLORS["yellow_edge"], fs=13, weight="bold")
+    box(ax, (7.0, 2.0), 0.8, 0.45, "ReLU", fc=COLORS["green"], ec=COLORS["green_edge"], fs=9)
+    for s, e in [((1.0, 2.23), (1.55, 2.23)), ((2.55, 2.23), (3.0, 2.23)), ((4.0, 2.23), (4.45, 2.23)), ((5.45, 2.23), (5.96, 2.23)), ((6.44, 2.23), (7.0, 2.23))]:
         arrow(ax, s, e)
-    ax.plot([1.3, 1.3, 5.4], [1.7, 1.0, 1.0], color="#b88700", lw=1.7)
-    arrow(ax, (5.4, 1.0), (5.75, 1.75), color="#b88700", lw=1.7)
-    ax.text(3.9, 2.75, "ResNet basic block: y = x + F(x)", ha="center", fontsize=12, weight="bold")
+    ax.plot([1.0, 1.0, 6.0], [1.9, 1.15, 1.15], color=COLORS["yellow_edge"], lw=1.8)
+    arrow(ax, (6.0, 1.15), (6.12, 2.0), color=COLORS["yellow_edge"], lw=1.8)
+    ax.text(3.7, 0.62, "$y = F(x) + x$", ha="center", fontsize=12)
+    ax.set_xlim(0.1, 8.1)
+    ax.set_ylim(0.25, 4.25)
 
-    # Depthwise separable
-    box(ax, (1.2, 0.05), 1.45, 0.5, "depthwise 3x3\nspatial per channel", fc="#ffe0d6", ec="#d62728", fs=9)
-    box(ax, (3.5, 0.05), 1.45, 0.5, "pointwise 1x1\nchannel mixing", fc="#eadcff", ec="#6a38ad", fs=9)
-    arrow(ax, (2.65, 0.3), (3.5, 0.3), color="#555")
-    ax.text(3.1, -0.45, "Depthwise separable conv splits spatial filtering and channel mixing", ha="center", fontsize=10, color="#444")
-    ax.set_xlim(0.2, 8.5)
-    ax.set_ylim(-0.8, 3.1)
-    out = OUT / "modern-cnn-blocks.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"wrote {out}")
+    ax2.text(3.0, 3.95, "Depthwise separable convolution", ha="center", fontsize=13, weight="bold")
+    draw_tensor_stack(ax2, 0.25, 1.8, 0.9, 1.0, 4, COLORS["blue"], COLORS["blue_edge"], "input")
+    box(ax2, (1.85, 2.1), 1.25, 0.55, "depthwise\nk x k", fc=COLORS["red"], ec=COLORS["red_edge"], fs=9)
+    box(ax2, (3.8, 2.1), 1.25, 0.55, "pointwise\n1x1", fc=COLORS["purple"], ec=COLORS["purple_edge"], fs=9)
+    draw_tensor_stack(ax2, 5.75, 1.8, 0.9, 1.0, 5, COLORS["green"], COLORS["green_edge"], "output")
+    arrow(ax2, (1.2, 2.35), (1.85, 2.35))
+    arrow(ax2, (3.1, 2.35), (3.8, 2.35))
+    arrow(ax2, (5.05, 2.35), (5.75, 2.35))
+    ax2.text(2.5, 1.25, "spatial filtering\nper channel", ha="center", fontsize=9, color=COLORS["red_edge"])
+    ax2.text(4.45, 1.25, "channel mixing", ha="center", fontsize=9, color=COLORS["purple_edge"])
+    box(ax2, (1.0, 0.4), 5.1, 0.48, "params: C_in*k*k + C_in*C_out instead of C_in*C_out*k*k", fc=COLORS["yellow"], ec=COLORS["yellow_edge"], fs=9)
+    ax2.set_xlim(0.0, 7.1)
+    ax2.set_ylim(0.15, 4.25)
+    save(fig, "modern-cnn-blocks.png")
 
 
 def main():

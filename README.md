@@ -30,6 +30,7 @@
 [generate_figures.py](neural-networks/scripts/generate_figures.py)
 
 **参考论文**:[references.md](neural-networks/references.md)
+**论文原图导航**:[paper-figures.md](neural-networks/paper-figures.md)
 
 ### 📘 [transformer/](transformer/) — Transformer 架构
 
@@ -171,6 +172,7 @@ learning/
 ├── neural-networks/          ← 子项目 0:基础神经网络
 │   ├── README.md
 │   ├── references.md         经典论文清单
+│   ├── paper-figures.md      论文原图导航
 │   ├── references/           可公开下载的论文 PDF
 │   ├── 00..11-*.md           12 节基础笔记
 │   ├── images/               可视化图

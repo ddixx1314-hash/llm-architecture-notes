@@ -24,6 +24,7 @@
 - [references.md](references.md) 汇总了本系列涉及的经典论文,按章节给出阅读入口。
 - [references/](references/) 存放可公开下载的论文 PDF。
 - [images/](images/) 存放本系列示意图,由 [scripts/generate_figures.py](scripts/generate_figures.py) 生成。
+- [paper-figures.md](paper-figures.md) 标出建议搭配阅读的论文原图位置。
 
 ## 阅读建议
 
