@@ -6,7 +6,7 @@
 
 ### 📙 [neural-networks/](neural-networks/) — 基础神经网络
 
-从最基础的 MLP、反向传播开始,补齐 CNN、RNN、LSTM/GRU、Autoencoder、GNN 以及归一化/正则化等常见模块,作为阅读 Transformer/Jamba 前的神经网络底座。
+从最基础的 MLP、反向传播开始,补齐 CNN、RNN、LSTM/GRU、Autoencoder、GNN、训练技巧、Embedding 以及 Seq2Seq Attention 等常见模块,作为阅读 Transformer/Jamba 前的神经网络底座。
 
 | 节 | 主题 |
 |----|------|
@@ -17,6 +17,11 @@
 | [4](neural-networks/04-autoencoder.md) | Autoencoder 自编码器(压缩、重构、去噪、VAE 直觉) |
 | [5](neural-networks/05-gnn.md) | GNN 图神经网络(message passing、GCN、GAT 直觉) |
 | [6](neural-networks/06-normalization-regularization.md) | 归一化与正则化(BatchNorm、LayerNorm、Dropout、残差) |
+| [7](neural-networks/07-optimizers-training-loop.md) | 优化器与训练循环(SGD、Momentum、AdamW、scheduler) |
+| [8](neural-networks/08-initialization-gradients.md) | 初始化与梯度稳定(Xavier、Kaiming、梯度消失/爆炸) |
+| [9](neural-networks/09-embeddings-representation.md) | Embedding 与表示学习(token/id 到连续向量) |
+| [10](neural-networks/10-seq2seq-attention.md) | Seq2Seq 与 Attention 过渡(RNN attention 到 Transformer) |
+| [11](neural-networks/11-modern-cnn-blocks.md) | 现代 CNN Block(ResNet、1x1 卷积、深度可分离卷积) |
 
 ### 📘 [transformer/](transformer/) — Transformer 架构
 
@@ -151,7 +156,7 @@ learning/
 │
 ├── neural-networks/          ← 子项目 0:基础神经网络
 │   ├── README.md
-│   └── 00..06-*.md           7 节基础笔记
+│   └── 00..11-*.md           12 节基础笔记
 │
 ├── transformer/              ← 子项目 1:Transformer
 │   ├── README.md             该子项目的学习路线 + 阅读建议

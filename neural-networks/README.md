@@ -13,14 +13,20 @@
 | [4](04-autoencoder.md) | Autoencoder 自编码器 | 无监督表示学习,压缩、去噪、重构 | ✅ |
 | [5](05-gnn.md) | GNN 图神经网络 | 图结构数据,节点如何从邻居聚合信息 | ✅ |
 | [6](06-normalization-regularization.md) | 归一化与正则化 | 为什么 BatchNorm/LayerNorm/Dropout/残差能让网络更好训练 | ✅ |
+| [7](07-optimizers-training-loop.md) | 优化器与训练循环 | SGD、Momentum、AdamW、scheduler、train/eval 模式 | ✅ |
+| [8](08-initialization-gradients.md) | 初始化与梯度稳定 | Xavier、Kaiming、梯度消失/爆炸、残差稳定性 | ✅ |
+| [9](09-embeddings-representation.md) | Embedding 与表示学习 | 离散 token/id 如何变成连续向量 | ✅ |
+| [10](10-seq2seq-attention.md) | Seq2Seq 与 Attention 过渡 | 从 RNN attention 自然过渡到 Transformer | ✅ |
+| [11](11-modern-cnn-blocks.md) | 现代 CNN Block | 1x1 卷积、ResNet、深度可分离卷积、全局池化 | ✅ |
 
 ## 阅读建议
 
-**第一次学习**建议按 0 → 1 → 2 → 3 → 4 → 5 → 6 顺序读:
+**第一次学习**建议按 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 顺序读:
 
 - 第 0 节是所有后续模型的共同底座。
 - CNN 偏图像和局部结构,RNN/LSTM/GRU 偏序列,GNN 偏关系结构。
 - 第 6 节不是一个单独模型,但它解释了很多现代网络为什么能训练得深。
+- 第 7-9 节补齐训练工程和表示学习,第 10 节是通往 Transformer 的桥。
 
 **和 Transformer 系列的关系**:
 
@@ -31,6 +37,9 @@
 | 门控机制 | LSTM/GRU、SwiGLU、Mamba selective gate |
 | LayerNorm、残差连接 | Transformer Encoder/Decoder block |
 | 表示学习和瓶颈 | Autoencoder、embedding、latent representation |
+| Seq2Seq attention | Transformer cross-attention/self-attention |
+| AdamW、warmup、梯度裁剪 | Transformer/LLM 训练循环 |
+| 初始化和残差稳定性 | 深层 Transformer、Mamba/Jamba block |
 
 ## 通用符号
 
@@ -56,3 +65,6 @@
 5. Autoencoder 学到的 latent representation 有什么用?
 6. GNN 的 message passing 和 attention 有什么相似之处?
 7. BatchNorm、LayerNorm、Dropout、残差分别在解决什么训练问题?
+8. AdamW 为什么比朴素 SGD 更常用?
+9. Embedding lookup 为什么等价于 one-hot 乘矩阵?
+10. RNN attention 如何自然引出 Transformer?
