@@ -4,6 +4,20 @@
 
 ## 已完成的子项目
 
+### 📙 [neural-networks/](neural-networks/) — 基础神经网络
+
+从最基础的 MLP、反向传播开始,补齐 CNN、RNN、LSTM/GRU、Autoencoder、GNN 以及归一化/正则化等常见模块,作为阅读 Transformer/Jamba 前的神经网络底座。
+
+| 节 | 主题 |
+|----|------|
+| [0](neural-networks/00-mlp-backprop.md) | MLP 与反向传播(线性层、激活、loss、梯度下降) |
+| [1](neural-networks/01-cnn.md) | CNN 卷积神经网络(局部连接、权重共享、padding/stride) |
+| [2](neural-networks/02-rnn.md) | RNN 循环神经网络(hidden state、BPTT、串行瓶颈) |
+| [3](neural-networks/03-lstm-gru.md) | LSTM 与 GRU(门控、长期记忆、梯度消失缓解) |
+| [4](neural-networks/04-autoencoder.md) | Autoencoder 自编码器(压缩、重构、去噪、VAE 直觉) |
+| [5](neural-networks/05-gnn.md) | GNN 图神经网络(message passing、GCN、GAT 直觉) |
+| [6](neural-networks/06-normalization-regularization.md) | 归一化与正则化(BatchNorm、LayerNorm、Dropout、残差) |
+
 ### 📘 [transformer/](transformer/) — Transformer 架构
 
 从 RNN 的局限出发,推导 Self-Attention 完整数学,搭建到完整 Encoder-Decoder,最后看现代 LLM(GPT/LLaMA)的关键改造。
@@ -42,10 +56,10 @@
 ## 学习路线建议
 
 ```
-transformer/ (必读) ──► jamba/ (建议读完 transformer 再学)
+neural-networks/ (基础) ──► transformer/ (必读) ──► jamba/ (建议读完 transformer 再学)
 ```
 
-`jamba/` 假设你已经熟悉 Self-Attention、Multi-Head、KV Cache 等概念,会直接对比"Mamba 在哪些地方替代 Transformer、在哪些地方共存"。
+`transformer/` 默认你已经理解线性层、激活函数、反向传播、归一化、残差等基础概念;`jamba/` 假设你已经熟悉 Self-Attention、Multi-Head、KV Cache 等概念,会直接对比"Mamba 在哪些地方替代 Transformer、在哪些地方共存"。
 
 ## 通用符号约定
 
@@ -134,6 +148,10 @@ learning/
 ├── environment.yml           ← 共享 conda 环境(精简)
 ├── environment.lock.yml      ← 共享 conda 环境(精确锁版本)
 ├── .gitignore
+│
+├── neural-networks/          ← 子项目 0:基础神经网络
+│   ├── README.md
+│   └── 00..06-*.md           7 节基础笔记
 │
 ├── transformer/              ← 子项目 1:Transformer
 │   ├── README.md             该子项目的学习路线 + 阅读建议
