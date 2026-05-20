@@ -23,6 +23,11 @@
 | [10](neural-networks/10-seq2seq-attention.md) | Seq2Seq 与 Attention 过渡(RNN attention 到 Transformer) |
 | [11](neural-networks/11-modern-cnn-blocks.md) | 现代 CNN Block(ResNet、1x1 卷积、深度可分离卷积) |
 
+**配套代码**:
+[basic_models.py](neural-networks/scripts/basic_models.py)、
+[sequence_models.py](neural-networks/scripts/sequence_models.py)、
+[representation_models.py](neural-networks/scripts/representation_models.py)
+
 ### 📘 [transformer/](transformer/) — Transformer 架构
 
 从 RNN 的局限出发,推导 Self-Attention 完整数学,搭建到完整 Encoder-Decoder,最后看现代 LLM(GPT/LLaMA)的关键改造。
@@ -111,6 +116,11 @@ conda activate learning
 python transformer/scripts/mini_gpt.py
 python transformer/scripts/generate_figures.py
 
+# 跑 neural-networks 配套代码
+python neural-networks/scripts/basic_models.py
+python neural-networks/scripts/sequence_models.py
+python neural-networks/scripts/representation_models.py
+
 # 跑 jamba 配套代码
 python jamba/scripts/mini_mamba.py
 python jamba/scripts/mini_jamba.py
@@ -156,7 +166,8 @@ learning/
 │
 ├── neural-networks/          ← 子项目 0:基础神经网络
 │   ├── README.md
-│   └── 00..11-*.md           12 节基础笔记
+│   ├── 00..11-*.md           12 节基础笔记
+│   └── scripts/              MLP/CNN/RNN/Autoencoder/GNN 等可运行示例
 │
 ├── transformer/              ← 子项目 1:Transformer
 │   ├── README.md             该子项目的学习路线 + 阅读建议

@@ -68,3 +68,25 @@
 8. AdamW 为什么比朴素 SGD 更常用?
 9. Embedding lookup 为什么等价于 one-hot 乘矩阵?
 10. RNN attention 如何自然引出 Transformer?
+
+## 配套代码
+
+这些脚本都使用随机/合成数据,不需要下载数据集,适合快速验证每类网络的数据流:
+
+- [scripts/basic_models.py](scripts/basic_models.py)
+  - MLP 二分类、CNN 图像分类、AdamW 训练循环、初始化、ResNet-style block、depthwise separable conv
+  - 运行:`python neural-networks/scripts/basic_models.py`
+- [scripts/sequence_models.py](scripts/sequence_models.py)
+  - RNN/LSTM/GRU 序列分类、Embedding + weight tying、Additive Attention
+  - 运行:`python neural-networks/scripts/sequence_models.py`
+- [scripts/representation_models.py](scripts/representation_models.py)
+  - Autoencoder 低维重构、GCN 节点分类
+  - 运行:`python neural-networks/scripts/representation_models.py`
+
+如果当前目录已经在 `neural-networks/`,也可以写成:
+
+```bash
+python scripts/basic_models.py
+python scripts/sequence_models.py
+python scripts/representation_models.py
+```
