@@ -171,6 +171,7 @@ learning/
 ├── neural-networks/          ← 子项目 0:基础神经网络
 │   ├── README.md
 │   ├── references.md         经典论文清单
+│   ├── references/           可公开下载的论文 PDF
 │   ├── 00..11-*.md           12 节基础笔记
 │   ├── images/               可视化图
 │   └── scripts/              MLP/CNN/RNN/Autoencoder/GNN 等可运行示例 + 图片生成
