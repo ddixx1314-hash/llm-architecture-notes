@@ -2,6 +2,8 @@
 
 > 本节目标:在基础 CNN 之后,继续理解 1x1 卷积、残差块、深度可分离卷积、全局平均池化这些现代 CNN 常见结构。
 
+![Modern CNN blocks](images/modern-cnn-blocks.png)
+
 ---
 
 ## 11.1 为什么还要看现代 CNN?

@@ -26,7 +26,10 @@
 **配套代码**:
 [basic_models.py](neural-networks/scripts/basic_models.py)、
 [sequence_models.py](neural-networks/scripts/sequence_models.py)、
-[representation_models.py](neural-networks/scripts/representation_models.py)
+[representation_models.py](neural-networks/scripts/representation_models.py)、
+[generate_figures.py](neural-networks/scripts/generate_figures.py)
+
+**参考论文**:[references.md](neural-networks/references.md)
 
 ### 📘 [transformer/](transformer/) — Transformer 架构
 
@@ -120,6 +123,7 @@ python transformer/scripts/generate_figures.py
 python neural-networks/scripts/basic_models.py
 python neural-networks/scripts/sequence_models.py
 python neural-networks/scripts/representation_models.py
+python neural-networks/scripts/generate_figures.py
 
 # 跑 jamba 配套代码
 python jamba/scripts/mini_mamba.py
@@ -166,8 +170,10 @@ learning/
 │
 ├── neural-networks/          ← 子项目 0:基础神经网络
 │   ├── README.md
+│   ├── references.md         经典论文清单
 │   ├── 00..11-*.md           12 节基础笔记
-│   └── scripts/              MLP/CNN/RNN/Autoencoder/GNN 等可运行示例
+│   ├── images/               可视化图
+│   └── scripts/              MLP/CNN/RNN/Autoencoder/GNN 等可运行示例 + 图片生成
 │
 ├── transformer/              ← 子项目 1:Transformer
 │   ├── README.md             该子项目的学习路线 + 阅读建议

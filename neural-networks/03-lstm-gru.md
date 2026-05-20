@@ -2,6 +2,8 @@
 
 > 本节目标:理解门控循环网络如何缓解 vanilla RNN 的长程依赖问题,重点掌握 LSTM/GRU 的 gate 在控制什么。
 
+![LSTM gates](images/lstm-gates.png)
+
 ---
 
 ## 3.1 Vanilla RNN 的问题

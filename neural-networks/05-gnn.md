@@ -2,6 +2,8 @@
 
 > 本节目标:理解图神经网络如何在节点、边和邻居之间传递信息,以及 message passing 与矩阵形式的基本推导。
 
+![GNN message passing](images/gnn-message-passing.png)
+
 ---
 
 ## 5.1 为什么需要 GNN?

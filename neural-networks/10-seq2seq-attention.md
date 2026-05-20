@@ -2,6 +2,8 @@
 
 > 本节目标:理解传统 Encoder-Decoder RNN 为什么需要 attention,以及 attention 如何从"固定长度瓶颈"一步步引出 Transformer。
 
+![Seq2Seq attention bridge](images/seq2seq-attention-bridge.png)
+
 ---
 
 ## 10.1 Seq2Seq 要解决什么?

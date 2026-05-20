@@ -2,6 +2,8 @@
 
 > 本节目标:理解卷积神经网络如何利用"局部连接"和"权重共享"处理图像,以及卷积核、通道、padding、stride 的形状变化。
 
+![CNN convolution overview](images/cnn-convolution-overview.png)
+
 ---
 
 ## 1.1 为什么图片不适合直接用 MLP?

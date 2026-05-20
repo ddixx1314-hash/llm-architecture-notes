@@ -19,6 +19,11 @@
 | [10](10-seq2seq-attention.md) | Seq2Seq 与 Attention 过渡 | 从 RNN attention 自然过渡到 Transformer | ✅ |
 | [11](11-modern-cnn-blocks.md) | 现代 CNN Block | 1x1 卷积、ResNet、深度可分离卷积、全局池化 | ✅ |
 
+## 参考论文与图片
+
+- [references.md](references.md) 汇总了本系列涉及的经典论文,按章节给出阅读入口。
+- [images/](images/) 存放本系列示意图,由 [scripts/generate_figures.py](scripts/generate_figures.py) 生成。
+
 ## 阅读建议
 
 **第一次学习**建议按 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 顺序读:
@@ -82,6 +87,9 @@
 - [scripts/representation_models.py](scripts/representation_models.py)
   - Autoencoder 低维重构、GCN 节点分类
   - 运行:`python neural-networks/scripts/representation_models.py`
+- [scripts/generate_figures.py](scripts/generate_figures.py)
+  - 生成 [images/](images/) 下的所有示意图
+  - 运行:`python neural-networks/scripts/generate_figures.py`
 
 如果当前目录已经在 `neural-networks/`,也可以写成:
 
@@ -89,4 +97,5 @@
 python scripts/basic_models.py
 python scripts/sequence_models.py
 python scripts/representation_models.py
+python scripts/generate_figures.py
 ```
